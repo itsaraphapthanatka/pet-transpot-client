@@ -1,26 +1,75 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, Modal, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
+import { authService } from '../../services/authService';
 import { AppButton } from '../../components/ui/AppButton';
 import { AppInput } from '../../components/ui/AppInput';
-import { Mail, Lock } from 'lucide-react-native';
+import { Mail, Lock, Phone } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 export default function LoginScreen() {
-    const [loading, setLoading] = useState(false);
-    const { login } = useAuthStore();
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [otp, setOtp] = useState('');
+    const [showOTPModal, setShowOTPModal] = useState(false);
+    const [otpSent, setOtpSent] = useState(false);
+    const [debugOTP, setDebugOTP] = useState('');
+
+    const { loginWithPassword, loginWithOTP, isLoading, error, clearError, role } = useAuthStore();
     const { t } = useTranslation();
 
-    const handleLogin = (role: 'customer' | 'driver' | 'admin') => {
-        setLoading(true);
-        setTimeout(() => {
-            login(role);
-            setLoading(false);
+    const handlePasswordLogin = async () => {
+        if (!username || !password) {
+            Alert.alert('Error', 'Please enter both email/phone and password');
+            return;
+        }
 
-            // Router redirection is handled by _layout.tsx in root
-        }, 1000);
+        try {
+            clearError();
+            await loginWithPassword(username, password);
+            // Navigation handled by _layout.tsx based on role
+        } catch (error: any) {
+            Alert.alert('Login Failed', error.message || 'Invalid credentials');
+        }
+    };
+
+    const handleRequestOTP = async () => {
+        if (!phoneNumber) {
+            Alert.alert('Error', 'Please enter your phone number');
+            return;
+        }
+
+        try {
+            const response = await authService.requestOTP(phoneNumber);
+            setOtpSent(true);
+            if (response.debug_otp) {
+                setDebugOTP(response.debug_otp);
+                Alert.alert('OTP Sent', `OTP sent to ${phoneNumber}\nDev OTP: ${response.debug_otp}`);
+            } else {
+                Alert.alert('OTP Sent', `OTP sent to ${phoneNumber}`);
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to send OTP');
+        }
+    };
+
+    const handleVerifyOTP = async () => {
+        if (!otp) {
+            Alert.alert('Error', 'Please enter the OTP code');
+            return;
+        }
+
+        try {
+            clearError();
+            await loginWithOTP(phoneNumber, otp);
+            setShowOTPModal(false);
+            // Navigation handled by _layout.tsx based on role
+        } catch (error: any) {
+            Alert.alert('Verification Failed', error.message || 'Invalid OTP');
+        }
     };
 
     return (
@@ -39,12 +88,18 @@ export default function LoginScreen() {
                     <View className="space-y-4">
                         <AppInput
                             label={t('login_screen.email')}
-                            placeholder="Example@email.com"
+                            placeholder="email@example.com or +66812345678"
+                            value={username}
+                            onChangeText={setUsername}
+                            autoCapitalize="none"
+                            keyboardType="email-address"
                             icon={<Mail size={20} color="gray" />}
                         />
                         <AppInput
                             label={t('login_screen.password')}
                             placeholder="********"
+                            value={password}
+                            onChangeText={setPassword}
                             secureTextEntry
                             icon={<Lock size={20} color="gray" />}
                         />
@@ -53,12 +108,23 @@ export default function LoginScreen() {
                             <Text className="text-primary font-semibold">{t('login_screen.forgot_password')}</Text>
                         </TouchableOpacity>
 
-                        <AppButton title={t('login_screen.login_as_customer')} onPress={() => handleLogin('customer')} isLoading={loading} />
+                        <AppButton
+                            title={t('login_screen.login_as_customer')}
+                            onPress={handlePasswordLogin}
+                            isLoading={isLoading}
+                        />
 
-                        <View className="flex-row justify-between mt-4">
-                            <AppButton title={t('login_screen.driver')} variant="outline" className="flex-1 mr-2" onPress={() => handleLogin('driver')} />
-                            <AppButton title={t('login_screen.admin')} variant="ghost" className="flex-1 ml-2" onPress={() => handleLogin('admin')} />
+                        <View className="flex-row items-center my-6">
+                            <View className="flex-1 h-px bg-gray-300" />
+                            <Text className="mx-4 text-gray-500">OR</Text>
+                            <View className="flex-1 h-px bg-gray-300" />
                         </View>
+
+                        <AppButton
+                            title="Login with OTP"
+                            variant="outline"
+                            onPress={() => setShowOTPModal(true)}
+                        />
                     </View>
 
                     <View className="flex-row justify-center mt-10">
@@ -70,6 +136,103 @@ export default function LoginScreen() {
 
                 </ScrollView>
             </KeyboardAvoidingView>
+
+            {/* OTP Modal */}
+            <Modal
+                visible={showOTPModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => {
+                    setShowOTPModal(false);
+                    setOtpSent(false);
+                    setOtp('');
+                    setPhoneNumber('');
+                }}
+            >
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <View className="flex-1 justify-end bg-black/50">
+                        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+                            <View className="bg-white rounded-t-3xl p-6 min-h-[400px]">
+                                <Text className="text-2xl font-bold text-gray-900 mb-2">Login with OTP</Text>
+                                <Text className="text-gray-500 mb-6">Enter your phone number to receive a one-time password</Text>
+
+                                <AppInput
+                                    label="Phone Number"
+                                    placeholder="+66812345678"
+                                    value={phoneNumber}
+                                    onChangeText={setPhoneNumber}
+                                    keyboardType="phone-pad"
+                                    icon={<Phone size={20} color="gray" />}
+                                    editable={!otpSent}
+                                />
+
+                                {otpSent && (
+                                    <View className="mt-4">
+                                        <AppInput
+                                            label="OTP Code"
+                                            placeholder="Enter 6-digit code"
+                                            value={otp}
+                                            onChangeText={(text) => {
+                                                setOtp(text);
+                                                if (text.length === 6) {
+                                                    Keyboard.dismiss();
+                                                }
+                                            }}
+                                            keyboardType="number-pad"
+                                            maxLength={6}
+                                        />
+                                        {debugOTP && (
+                                            <Text className="text-sm text-orange-600 mt-2">Dev OTP: {debugOTP}</Text>
+                                        )}
+                                    </View>
+                                )}
+
+                                <View className="mt-6 space-y-3">
+                                    {!otpSent ? (
+                                        <AppButton
+                                            title="Request OTP"
+                                            onPress={() => {
+                                                Keyboard.dismiss();
+                                                handleRequestOTP();
+                                            }}
+                                        />
+                                    ) : (
+                                        <>
+                                            <AppButton
+                                                title="Verify OTP"
+                                                onPress={() => {
+                                                    Keyboard.dismiss();
+                                                    handleVerifyOTP();
+                                                }}
+                                                isLoading={isLoading}
+                                            />
+                                            <AppButton
+                                                title="Request New OTP"
+                                                variant="outline"
+                                                onPress={() => {
+                                                    Keyboard.dismiss();
+                                                    handleRequestOTP();
+                                                }}
+                                            />
+                                        </>
+                                    )}
+                                    <AppButton
+                                        title="Cancel"
+                                        variant="ghost"
+                                        onPress={() => {
+                                            Keyboard.dismiss();
+                                            setShowOTPModal(false);
+                                            setOtpSent(false);
+                                            setOtp('');
+                                            setPhoneNumber('');
+                                        }}
+                                    />
+                                </View>
+                            </View>
+                        </KeyboardAvoidingView>
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
         </SafeAreaView>
     );
 }

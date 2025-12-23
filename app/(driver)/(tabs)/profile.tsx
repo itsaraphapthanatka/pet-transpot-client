@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 
 export default function DriverProfileScreen() {
     const { user, logout } = useAuthStore();
+    console.log('useccr', user);
 
     const handleLogout = () => {
         logout();
@@ -32,7 +33,7 @@ export default function DriverProfileScreen() {
                             <User size={40} color="gray" />
                         )}
                     </View>
-                    <Text className="text-xl font-bold text-gray-800">{user?.name || 'Driver'}</Text>
+                    <Text className="text-xl font-bold text-gray-800">{user?.full_name || 'Driver'}</Text>
                     <Text className="text-gray-500">{user?.email || 'driver@example.com'}</Text>
                     <View className="bg-green-100 px-3 py-1 rounded-full mt-2">
                         <Text className="text-green-700 font-bold text-xs">Verified Driver</Text>

@@ -2,8 +2,9 @@ import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/useAuthStore';
-import { Users, Car, TrendingUp, LogOut } from 'lucide-react-native';
+import { Users, Car, TrendingUp, LogOut, Map as MapIcon } from 'lucide-react-native';
 import { AppButton } from '../../components/ui/AppButton';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
 const STATS = [
     { title: "Total Users", value: "1,240", icon: <Users size={24} color="#2962FF" />, bg: "bg-blue-100" },
@@ -11,8 +12,10 @@ const STATS = [
     { title: "Revenue (Today)", value: "฿45,200", icon: <TrendingUp size={24} color="#FF9100" />, bg: "bg-orange-100" },
 ];
 
+// Admin Dashboard Screen
 export default function AdminDashboard() {
     const { logout } = useAuthStore();
+    const { mapProvider, setMapProvider } = useSettingsStore();
 
     return (
         <SafeAreaView className="flex-1 bg-gray-50">
@@ -27,6 +30,28 @@ export default function AdminDashboard() {
             </View>
 
             <ScrollView className="flex-1 px-6 pt-6">
+                {/* Map Provider Settings */}
+                <View className="bg-white p-4 rounded-xl shadow-sm mb-6">
+                    <View className="flex-row items-center mb-3">
+                        <MapIcon size={20} color="#4B5563" className="mr-2" />
+                        <Text className="text-gray-800 font-bold">Map Provider</Text>
+                    </View>
+                    <View className="flex-row bg-gray-100 p-1 rounded-lg">
+                        <TouchableOpacity
+                            className={`flex-1 py-2 items-center rounded-md ${mapProvider === 'google' ? 'bg-white shadow-sm' : ''}`}
+                            onPress={() => setMapProvider('google')}
+                        >
+                            <Text className={`font-medium ${mapProvider === 'google' ? 'text-blue-600' : 'text-gray-500'}`}>Google Maps</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            className={`flex-1 py-2 items-center rounded-md ${mapProvider === 'here' ? 'bg-white shadow-sm' : ''}`}
+                            onPress={() => setMapProvider('here')}
+                        >
+                            <Text className={`font-medium ${mapProvider === 'here' ? 'text-blue-600' : 'text-gray-500'}`}>HERE Maps</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
                 {/* Stats Grid */}
                 <View className="flex-row flex-wrap justify-between">
                     {STATS.map((stat, index) => (
