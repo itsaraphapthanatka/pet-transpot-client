@@ -18,46 +18,57 @@ type SearchResult = {
 };
 
 export default function DestinationScreen() {
-    const [search, setSearch] = useState('');
+    const [pickupQuery, setPickupQuery] = useState('');
+    const [dropoffQuery, setDropoffQuery] = useState('');
+    const [activeField, setActiveField] = useState<'pickup' | 'dropoff'>('dropoff');
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState<SearchResult[]>([]);
-    const { setDropoffLocation, setPickupLocation } = useBookingStore();
+    const { setDropoffLocation, setPickupLocation, pickupLocation } = useBookingStore();
     const { t } = useTranslation();
-
-    useEffect(() => {
-        (async () => {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permission to access location was denied');
-                return;
-            }
-
-            // Get current location for Pickup if not set
-            const location = await Location.getCurrentPositionAsync({});
-            setPickupLocation({
-                name: t('current_location'),
-                address: 'Current Location',
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude
-            });
-        })();
-    }, []);
 
     const LONGDO_API_KEY = process.env.EXPO_PUBLIC_LONGDO_MAP_API_KEY || 'YOUR_LONGDO_MAP_API_KEY';
 
+    // Initialize pickup with current location or existing store value
     useEffect(() => {
+        (async () => {
+            // Permission check can happen here or assume it's done/handled globally
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                // Alert.alert('Permission to access location was denied'); // Optional: Too noisy if just browsing
+                return;
+            }
+
+            if (!pickupLocation) {
+                const location = await Location.getCurrentPositionAsync({});
+                // Reverse geocode or just use "Current Location" for now, allowing user to edit
+                // For better UX, we could try to reverse geocode here using Longdo or Expo
+                const initialName = t('current_location');
+                setPickupLocation({
+                    name: initialName,
+                    address: 'Current Location',
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                });
+                setPickupQuery(initialName);
+            } else {
+                setPickupQuery(pickupLocation.name || '');
+            }
+        })();
+    }, []);
+
+    // Debounced Search Effect
+    useEffect(() => {
+        const query = activeField === 'pickup' ? pickupQuery : dropoffQuery;
+
         const searchPlaces = async () => {
-            if (!search.trim()) {
+            if (!query.trim()) {
                 setResults([]);
                 return;
             }
 
             setLoading(true);
             try {
-                // Use Longdo Map API for search
-                const longdoResults = await longdoMapApi.search(search, LONGDO_API_KEY);
-
-                // Map Longdo results to SearchResult type
+                const longdoResults = await longdoMapApi.search(query, LONGDO_API_KEY);
                 const mappedResults: SearchResult[] = longdoResults.map(item => ({
                     id: item.id,
                     name: item.name,
@@ -65,7 +76,6 @@ export default function DestinationScreen() {
                     latitude: item.latitude,
                     longitude: item.longitude
                 }));
-
                 setResults(mappedResults);
             } catch (error) {
                 console.error('Longdo search error:', error);
@@ -77,27 +87,34 @@ export default function DestinationScreen() {
 
         const timeoutId = setTimeout(() => {
             searchPlaces();
-        }, 800); // 800ms debounce
+        }, 800);
 
         return () => clearTimeout(timeoutId);
-    }, [search]);
+    }, [pickupQuery, dropoffQuery, activeField]);
 
     const handleSelectLocation = (item: SearchResult) => {
-        setDropoffLocation({
-            name: item.name,
-            address: item.address,
-            latitude: item.latitude,
-            longitude: item.longitude
-        });
-
-        // Check if pickup is set, if not try to set it to current location (fallback)
-        // This is handled by useEffect on mount, but as a safety net:
-        if (!useBookingStore.getState().pickupLocation) {
-            // We can't easily wait for async here without blocking, so we rely on the mount effect or user not disabling location.
-            // But let's NOT overwrite it with hardcoded values if it IS set.
+        if (activeField === 'pickup') {
+            setPickupLocation({
+                name: item.name,
+                address: item.address,
+                latitude: item.latitude,
+                longitude: item.longitude
+            });
+            setPickupQuery(item.name);
+            // Auto-focus dropoff after picking pickup
+            setActiveField('dropoff');
+        } else {
+            setDropoffLocation({
+                name: item.name,
+                address: item.address,
+                latitude: item.latitude,
+                longitude: item.longitude
+            });
+            setDropoffQuery(item.name);
+            router.push('/(customer)/booking/select-pet');
         }
-
-        router.push('/(customer)/booking/select-pet');
+        // Clear results for the next interaction (optional, or keep them)
+        setResults([]);
     };
 
     return (
@@ -108,24 +125,29 @@ export default function DestinationScreen() {
                 </TouchableOpacity>
 
                 <View>
+                    {/* Pickup Input */}
                     <View className="flex-row items-center mb-4">
                         <View className="w-3 h-3 bg-blue-500 rounded-full mr-3" />
                         <AppInput
                             placeholder={t('current_location')}
-                            value={t('current_location')}
-                            containerClassName="mb-0 flex-1"
-                            className="bg-gray-50 border-0"
-                            editable={false}
+                            value={pickupQuery}
+                            onChangeText={setPickupQuery}
+                            onFocus={() => setActiveField('pickup')}
+                            containerClassName={`mb-0 flex-1 ${activeField === 'pickup' ? 'border-blue-500 border' : 'border-gray-100'}`}
+                            className="bg-gray-50"
                         />
                     </View>
+
+                    {/* Dropoff Input */}
                     <View className="flex-row items-center">
                         <View className="w-3 h-3 bg-red-500 rounded-sm mr-3" />
                         <AppInput
                             placeholder={t('where_to')}
-                            value={search}
-                            onChangeText={setSearch}
-                            containerClassName="mb-0 flex-1"
-                            autoFocus
+                            value={dropoffQuery}
+                            onChangeText={setDropoffQuery}
+                            onFocus={() => setActiveField('dropoff')}
+                            containerClassName={`mb-0 flex-1 ${activeField === 'dropoff' ? 'border-blue-500 border' : 'border-gray-100'}`}
+                            autoFocus={true} // Default focus on dropoff
                         />
                     </View>
                 </View>
@@ -140,13 +162,17 @@ export default function DestinationScreen() {
                     <FlatList
                         data={results}
                         keyExtractor={item => item.id}
-                        ListEmptyComponent={() => (
-                            <View className="p-4 items-center">
-                                <Text className="text-gray-400">
-                                    {search ? t('no_location_found') : t('enter_destination')}
-                                </Text>
-                            </View>
-                        )}
+                        keyboardShouldPersistTaps="handled"
+                        ListEmptyComponent={() => {
+                            const currentQuery = activeField === 'pickup' ? pickupQuery : dropoffQuery;
+                            return (
+                                <View className="p-4 items-center">
+                                    <Text className="text-gray-400">
+                                        {currentQuery ? t('no_location_found') : (activeField === 'pickup' ? t('enter_pickup') : t('enter_destination'))}
+                                    </Text>
+                                </View>
+                            );
+                        }}
                         renderItem={({ item }) => (
                             <TouchableOpacity
                                 className="flex-row items-center p-4 border-b border-gray-50"

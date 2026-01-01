@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useJobStore } from '../../../store/useJobStore';
 import { AppButton } from '../../../components/ui/AppButton';
-import { MapPin, Navigation, AlertCircle } from 'lucide-react-native';
+import { MapPin, Navigation, AlertCircle, Bell } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Order } from '../../../types/order';
 import * as Location from 'expo-location';
@@ -213,12 +213,34 @@ export default function DriverHomeScreen() {
                 <View className="bg-gray-50 p-3 rounded-lg flex-row items-center mb-4">
                     <Text className="text-lg mr-2">{getPetEmoji(job.pet?.type)}</Text>
                     <View className="flex-1">
-                        <Text className="text-gray-800 font-medium">
-                            {job.pet?.name || 'Pet'}
-                        </Text>
-                        <Text className="text-gray-500 text-xs">
-                            {job.pet?.type} {job.pet?.breed ? `(${job.pet.breed})` : ''} • {job.pet?.weight ? `${job.pet.weight}kg` : ''}
-                        </Text>
+                        {/* Display multiple pets if available in array */}
+                        {job.pets && job.pets.length > 0 ? (
+                            job.pets.map((pet, index) => (
+                                <View key={pet.id || index} className="mb-1">
+                                    <Text className="text-gray-800 font-medium">
+                                        {pet.name}
+                                    </Text>
+                                    <Text className="text-gray-500 text-xs">
+                                        {pet.type} {pet.breed ? `(${pet.breed})` : ''} • {pet.weight ? `${pet.weight}kg` : ''}
+                                    </Text>
+                                </View>
+                            ))
+                        ) : (
+                            // Fallback to single pet or details string
+                            <>
+                                <Text className="text-gray-800 font-medium">
+                                    {job.pet_details || job.pet?.name || 'Pet'}
+                                </Text>
+                                <Text className="text-gray-500 text-xs">
+                                    {job.pet?.type} {job.pet?.breed ? `(${job.pet.breed})` : ''} • {job.pet?.weight ? `${job.pet.weight}kg` : ''}
+                                </Text>
+                            </>
+                        )}
+                        {job.passengers && (
+                            <Text className="text-gray-500 text-xs mt-1">
+                                Passengers: {job.passengers}
+                            </Text>
+                        )}
                     </View>
                 </View>
 
@@ -258,6 +280,14 @@ export default function DriverHomeScreen() {
                     </Text>
                 </View>
                 <View className="flex-row items-center">
+                    {/* Notification Bell Icon */}
+                    <TouchableOpacity
+                        onPress={() => router.push('/(driver)/notifications')}
+                        className="mr-4 p-2"
+                    >
+                        <Bell size={24} color="#4B5563" />
+                    </TouchableOpacity>
+
                     {isUpdatingStatus && <ActivityIndicator size="small" color="#00C853" style={{ marginRight: 8 }} />}
                     <Switch
                         value={isOnline}

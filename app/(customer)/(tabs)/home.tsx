@@ -2,7 +2,9 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Platform, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
+
+
 import { AppMapView } from '../../../components/AppMapView';
 import { Search, MapPin, Bike, Car, Truck, Menu, Bell, Locate, Plus, Minus } from 'lucide-react-native';
 import * as Location from 'expo-location';
@@ -11,12 +13,173 @@ import { MOCK_RIDE_OPTIONS } from '../../../utils/mockData';
 import { router } from 'expo-router';
 import { api, DriverLocation } from '../../../services/api';
 
+import { LocationSearch, SearchResult } from '../../../components/LocationSearch';
+import { longdoMapApi } from '../../../services/longdoMapApi';
+import { hereMapApi, LatLng, HereRouteSegment } from '../../../services/hereMapApi';
+import { useBookingStore } from '../../../store/useBookingStore';
+
+
+
+
+const HERE_MAPS_API_KEY = "z8S6QWJ90hW5peIMiwDk9sCdlKEPj7cYiZz0fdoAbxU";
+
 export default function CustomerHome() {
+
+
+
     const { user } = useAuthStore();
     console.log("userdddd", user);
     const { t } = useTranslation();
     const mapRef = React.useRef<MapView>(null);
     const [driverLocations, setDriverLocations] = React.useState<DriverLocation[]>([]);
+
+    // Booking Store
+    const { setDropoffLocation, setPickupLocation, pickupLocation, dropoffLocation } = useBookingStore();
+
+    const [routeCoordinates, setRouteCoordinates] = React.useState<LatLng[]>([]);
+    const [routeSegments, setRouteSegments] = React.useState<HereRouteSegment[]>([]);
+
+
+
+    // Local Search State
+    const [pickupQuery, setPickupQuery] = React.useState('');
+    const [dropoffQuery, setDropoffQuery] = React.useState('');
+    const [activeField, setActiveField] = React.useState<'pickup' | 'dropoff'>('dropoff'); // Default to dropoff
+    const [loading, setLoading] = React.useState(false);
+    const [results, setResults] = React.useState<SearchResult[]>([]);
+
+    const LONGDO_API_KEY = process.env.EXPO_PUBLIC_LONGDO_MAP_API_KEY || '';
+
+    // Initialize pickup with current location
+    React.useEffect(() => {
+        (async () => {
+            // Basic permission check
+            const { status } = await Location.getForegroundPermissionsAsync();
+            if (status === 'granted' && !pickupLocation) {
+                const location = await Location.getCurrentPositionAsync({});
+                const initialName = t('current_location');
+                setPickupLocation({
+                    name: initialName,
+                    address: 'Current Location',
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                });
+                setPickupQuery(initialName);
+            } else if (pickupLocation) {
+                setPickupQuery(pickupLocation.name || '');
+            }
+        })();
+    }, []);
+
+    // Debounced Search
+    React.useEffect(() => {
+        const query = activeField === 'pickup' ? pickupQuery : dropoffQuery;
+
+        const searchPlaces = async () => {
+            if (!query.trim()) {
+                setResults([]);
+                return;
+            }
+
+            setLoading(true);
+            try {
+                const longdoResults = await longdoMapApi.search(query, LONGDO_API_KEY);
+                const mappedResults: SearchResult[] = longdoResults.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    address: item.address,
+                    latitude: item.latitude,
+                    longitude: item.longitude
+                }));
+                setResults(mappedResults);
+            } catch (error) {
+                console.error('Longdo search error:', error);
+                setResults([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const timeoutId = setTimeout(() => {
+            searchPlaces();
+        }, 800);
+
+        return () => clearTimeout(timeoutId);
+        return () => clearTimeout(timeoutId);
+    }, [pickupQuery, dropoffQuery, activeField]);
+
+    // Fetch Route when both locations are set
+    React.useEffect(() => {
+        const fetchRoute = async () => {
+            if (pickupLocation && dropoffLocation) {
+                const origin: LatLng = { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude };
+                const destination: LatLng = { latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude };
+
+                // Use getHereRoute as it seems simpler for A to B, or getRoutes
+                // Force traffic mode: 'car' usually implies traffic consideration in HERE API if not disabled
+                const routes = await hereMapApi.getRoutes(origin, destination, 'car', HERE_MAPS_API_KEY);
+
+
+                if (routes.length > 0) {
+                    setRouteCoordinates(routes[0].coordinates);
+                    setRouteSegments(routes[0].segments);
+
+                    // Fit map to route
+                    mapRef.current?.fitToCoordinates(routes[0].coordinates, {
+                        edgePadding: { top: 100, right: 50, bottom: 400, left: 50 },
+                        animated: true
+                    });
+                }
+            } else {
+                setRouteCoordinates([]);
+                setRouteSegments([]);
+            }
+        };
+        fetchRoute();
+    }, [pickupLocation, dropoffLocation]);
+
+
+    const handleSelectLocation = (item: SearchResult) => {
+        if (activeField === 'pickup') {
+            setPickupLocation({
+                name: item.name,
+                address: item.address,
+                latitude: item.latitude,
+                longitude: item.longitude
+            });
+            setPickupQuery(item.name);
+            // Auto focus to dropoff
+            setActiveField('dropoff');
+
+            // Animate Map
+            mapRef.current?.animateToRegion({
+                latitude: item.latitude,
+                longitude: item.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            });
+
+        } else {
+            setDropoffLocation({
+                name: item.name,
+                address: item.address,
+                latitude: item.latitude,
+                longitude: item.longitude
+            });
+            setDropoffQuery(item.name);
+            setResults([]); // Clear results
+
+            // Animate Map
+            mapRef.current?.animateToRegion({
+                latitude: item.latitude,
+                longitude: item.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+            });
+        }
+        setResults([]);
+    };
+
 
     React.useEffect(() => {
         (async () => {
@@ -132,13 +295,61 @@ export default function CustomerHome() {
                 style={{ flex: 1 }}
 
                 showsUserLocation={true}
-                showsMyLocationButton={true}
+                showsMyLocationButton={false}
             >
-                {/* <Marker coordinate={{ latitude: 13.7563, longitude: 100.5018 }}>
-                    <View className="bg-white p-1.5 rounded-full border border-green-500 shadow-sm">
-                        <Car size={16} color="black" />
-                    </View>
-                </Marker> */}
+                {/* Pickup Marker */}
+                {pickupLocation && (
+                    <Marker coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }} title={t('pickup') || 'Pickup'}>
+                        <View className="bg-blue-500 p-1.5 rounded-full border border-white shadow-sm">
+                            <MapPin size={16} color="white" />
+                        </View>
+                    </Marker>
+                )}
+
+                {/* Dropoff Marker */}
+                {dropoffLocation && (
+                    <Marker coordinate={{ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }} title={t('dropoff') || 'Dropoff'}>
+                        <View className="bg-red-500 p-1.5 rounded-full border border-white shadow-sm">
+                            <MapPin size={16} color="white" />
+                        </View>
+                    </Marker>
+                )}
+
+                {/* Route Rendering: Single Layer Traffic Segments */}
+                {/* User requested "Do it on the destination line", implying no separate border/casing */}
+
+                {routeSegments.length > 0 ? (
+                    routeSegments.map((segment, index) => (
+                        <Polyline
+                            key={`segment-${index}`}
+                            coordinates={segment.coordinates}
+                            strokeColor={segment.color}
+                            strokeWidth={10}
+                            lineCap="round"
+                            lineJoin="round"
+                            zIndex={10}
+                        />
+                    ))
+                ) : (
+                    /* Fallback only if no segments found (Should be rare) */
+                    routeCoordinates.length > 0 && (
+                        <Polyline
+                            coordinates={routeCoordinates}
+                            strokeColor="#9CA3AF" // Gray-400 to indicate "No Traffic Data"
+                            strokeWidth={7}
+                            lineCap="round"
+                            lineJoin="round"
+                            zIndex={10}
+                        />
+                    )
+                )}
+
+
+
+
+
+
+
 
                 {/* Driver Markers */}
                 {driverLocations.map((driver) => (
@@ -162,7 +373,9 @@ export default function CustomerHome() {
 
             </MapView>
 
-            <SafeAreaView className="absolute top-0 w-full px-5 pt-2 flex-row justify-between items-center z-10">
+            <SafeAreaView className="absolute top-0 w-full px-5 pt-2 flex-row justify-between items-center z-10 pointer-events-none" style={{ display: 'none' }}>
+                {/* Hiding the top bar to make room for Search Input for now, or just move it down */}
+
                 <View className="flex-row items-center bg-white/90 p-2 pr-4 rounded-full shadow-md backdrop-blur-md">
                     <View className="w-8 h-8 bg-green-100 rounded-full items-center justify-center mr-2">
                         <Text className="text-lg">👤</Text>
@@ -179,7 +392,7 @@ export default function CustomerHome() {
             </SafeAreaView>
 
             {/* Zoom Controls */}
-            <View className="absolute right-5 bottom-[50%] z-50 flex-col gap-2">
+            <View className="absolute right-5 bottom-[150px] z-50 flex-col gap-2">
                 <TouchableOpacity
                     onPress={handleZoomIn}
                     className="bg-white p-3 rounded-full shadow-md elevation-5"
@@ -197,44 +410,41 @@ export default function CustomerHome() {
             {/* Current Location Button */}
             <TouchableOpacity
                 onPress={handleCurrentLocation}
-                className="absolute right-5 bottom-[42%] bg-white p-3 rounded-full shadow-md z-50 elevation-5"
+                className="absolute right-5 bottom-[100px] bg-white p-3 rounded-full shadow-md z-50 elevation-5"
             >
                 <Locate size={24} color="#374151" />
             </TouchableOpacity>
 
-            {/* Bottom Panel */}
-            <View className="absolute bottom-0 w-full bg-white rounded-t-3xl shadow-2xl elevation-10 pb-5 pt-6 px-5 h-[40%] z-50">
+            {/* Location Search Component - Replaces Navigation Button */}
+            <LocationSearch
+                pickupQuery={pickupQuery}
+                setPickupQuery={setPickupQuery}
+                dropoffQuery={dropoffQuery}
+                setDropoffQuery={setDropoffQuery}
+                activeField={activeField}
+                setActiveField={setActiveField}
+                results={results}
+                loading={loading}
+                onSelectLocation={handleSelectLocation}
+            />
 
-                {/* Search Trigger */}
-                <TouchableOpacity
-                    onPress={() => router.push('/(customer)/booking/destination')}
-                    className="flex-row items-center bg-gray-100 p-4 rounded-xl mb-6 border border-gray-200 shadow-sm"
-                >
-                    <Search size={22} color="#6B7280" className="mr-3" />
-                    <View>
-                        <Text className="text-lg font-bold text-gray-800">{t('where_to')}</Text>
-                        <Text className="text-xs text-gray-500">{t('home_screen.transport_safely')}</Text>
-                    </View>
-                </TouchableOpacity>
+            {/* Show Next Button only when both locations are selected */}
+            {pickupLocation && dropoffLocation && (
+                <View className="absolute bottom-10 w-full px-5 z-50">
+                    <TouchableOpacity
+                        onPress={() => router.push('/(customer)/booking/select-pet')}
+                        className="bg-primary p-4 rounded-xl shadow-lg flex-row justify-center items-center"
+                        style={{ backgroundColor: '#00A862' }} // Using primary color directly if tailwind config not fully loaded or for visual guarantee
+                    >
+                        <Text className="text-white font-bold text-lg">{t('continue') || 'Continue'}</Text>
+                        {/* <Car size={20} color="white" style={{ marginLeft: 8 }} /> */}
+                    </TouchableOpacity>
+                </View>
+            )}
 
-                {/* Quick Actions (Vehicles) */}
-                {/* <View>
-                    <Text className="text-base font-bold text-gray-800 mb-4">{t('choose_vehicle')}</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row pb-4">
-                        {MOCK_RIDE_OPTIONS.map((option) => (
-                            <TouchableOpacity key={option.id} className="mr-4 items-center">
-                                <View className="w-20 h-20 bg-green-50 rounded-2xl items-center justify-center border border-green-100 mb-2 shadow-sm">
-                                    {option.id === 'bike' && <Bike size={32} color="#00A862" />}
-                                    {option.id === 'car' && <Car size={32} color="#2962FF" />}
-                                    {option.id === 'van' && <Truck size={32} color="#FF9100" />}
-                                </View>
-                                <Text className="font-semibold text-gray-700 text-sm">{option.name}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View> */}
 
-            </View>
+            {/* Removed the panel that triggers router push */}
+
         </View>
     );
 }

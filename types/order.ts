@@ -39,17 +39,25 @@ export interface Order {
     dropoff_address: string;
     dropoff_lat: number;
     dropoff_lng: number;
-    status: OrderStatus;
+    status: string;
     price?: number | null;
+    platform_fee?: number | null;
+    driver_earnings?: number | null;
+    commission_rate?: number | null;
+    passengers?: number;
+    pet_details?: string | null;
     customer: UserOut;
     driver?: DriverOut | null;
+    created_at: string;
     pet: PetOut;
+    pets: PetOut[]; // New array
 }
 
 export interface OrderCreate {
     user_id: number;
     driver_id?: number | null;
     pet_id: number;
+    pet_ids?: number[]; // New array
     pickup_address: string;
     pickup_lat: number;
     pickup_lng: number;
@@ -58,4 +66,6 @@ export interface OrderCreate {
     dropoff_lng: number;
     status?: OrderStatus;
     price?: number | null;
+    passengers?: number;
+    pet_details?: string;
 }

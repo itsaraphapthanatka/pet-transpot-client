@@ -20,6 +20,7 @@ export interface DriverDetails {
     vehicle_type: string;
     vehicle_plate: string;
     is_online: boolean;
+    work_radius_km: number;
     id: number;
     user: {
         full_name: string;
@@ -228,6 +229,97 @@ export const api = {
             });
         } catch (error) {
             console.warn('Could not mark chat as read', error);
+        }
+    },
+
+    updateDriverWorkRadius: async (radiusKm: number): Promise<DriverDetails> => {
+        try {
+            const headers = await getAuthHeaders();
+            const response = await fetch(`${API_BASE_URL}/drivers/settings`, {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify({ work_radius_km: radiusKm }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to update work radius: ${response.status} - ${errorText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error updating driver work radius:', error);
+            throw error;
+        }
+    },
+
+    getNotifications: async (): Promise<any[]> => {
+        try {
+            const headers = await getAuthHeaders();
+            const response = await fetch(`${API_BASE_URL}/notifications/`, {
+                headers,
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch notifications');
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.warn('Could not fetch notifications', error);
+            return [];
+        }
+    },
+
+    markNotificationAsRead: async (notificationId: number): Promise<void> => {
+        try {
+            const headers = await getAuthHeaders();
+            const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
+                method: 'PUT',
+                headers,
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to mark notification as read');
+            }
+        } catch (error) {
+            console.warn('Could not mark notification as read', error);
+        }
+    },
+
+    getDriverEarnings: async (period: 'daily' | 'weekly' | 'monthly'): Promise<any> => {
+        try {
+            const headers = await getAuthHeaders();
+            const response = await fetch(`${API_BASE_URL}/drivers/earnings/summary?period=${period}`, {
+                headers,
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch earnings');
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.warn('Could not fetch earnings', error);
+            throw error;
+        }
+    },
+
+    getDriverStats: async (): Promise<any> => {
+        try {
+            const headers = await getAuthHeaders();
+            const response = await fetch(`${API_BASE_URL}/drivers/stats`, {
+                headers,
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch driver stats');
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.warn('Could not fetch driver stats', error);
+            throw error;
         }
     }
 };

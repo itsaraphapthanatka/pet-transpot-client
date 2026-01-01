@@ -6,7 +6,7 @@ import MapViewDirections from 'react-native-maps-directions';
 import { useTranslation } from 'react-i18next';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppButton } from '../../../components/ui/AppButton';
-import { ArrowLeft, MapPin, Clock, CreditCard, StickyNote, ChevronRight, Wallet, Bike, Car, Truck, Phone, MessageCircle, Star } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Clock, CreditCard, StickyNote, ChevronRight, Wallet, Bike, Car, Truck, Phone, MessageCircle, Star, PawPrint, User } from 'lucide-react-native';
 import { MOCK_RIDE_OPTIONS } from '../../../utils/mockData';
 import { useBookingStore } from '../../../store/useBookingStore';
 import { api, DriverLocation } from '../../../services/api';
@@ -29,8 +29,15 @@ export default function ConfirmBookingScreen() {
     const { t } = useTranslation();
     const params = useLocalSearchParams();
     const petWeight = params.petWeight ? Number(params.petWeight) : 0;
-    const petName = params.petName as string;
-    const petType = params.petType as string;
+    // const petName = params.petName as string; // Legacy single pet
+    // const petType = params.petType as string; // Legacy single pet
+    const passengers = params.passengers ? Number(params.passengers) : 1;
+
+    // Parse pet names if passed as a comma-separated string or array
+    const petNamesRaw = params.petNames;
+    const displayPetNames = petNamesRaw
+        ? (Array.isArray(petNamesRaw) ? petNamesRaw.join(', ') : petNamesRaw)
+        : 'Unknown Pet';
 
     const mapRef = useRef<MapView>(null);
     const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
@@ -336,6 +343,9 @@ export default function ConfirmBookingScreen() {
                 dropoff_lng: dropoffLocation.longitude,
                 price: price,
                 status: 'pending',
+                passengers: passengers,
+                pet_ids: petIds.map(Number), // Send all pet IDs
+                pet_details: displayPetNames
             });
 
             setCurrentOrder(order);
@@ -482,45 +492,6 @@ export default function ConfirmBookingScreen() {
         longitudeDelta: 0.1,
     }
 
-    // Fetch HERE Route Alternatives when provider is 'here'
-    React.useEffect(() => {
-        const fetchHereRoutes = async () => {
-            if (mapProvider === 'here' && pickupLocation && dropoffLocation) {
-                console.log("Starting to fetch HERE routes...");
-                const routes = await hereMapApi.getHereRouteAlternatives(
-                    { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude },
-                    { latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude },
-                    HERE_MAPS_API_KEY,
-                    3 // Request up to 3 alternative routes
-                );
-                console.log(`Received ${routes.length} routes from HERE API`);
-                setHereRoutes(routes);
-
-                // Set distance and duration from first route
-                if (routes.length > 0) {
-                    console.log("Setting distance and duration from first route");
-                    setDistance(routes[0].distance / 1000); // Convert meters to km
-                    setDuration(routes[0].duration / 60); // Convert seconds to minutes
-                }
-
-                // Fit map to first route
-                if (mapRef.current && routes.length > 0 && routes[0].coordinates.length > 0) {
-                    console.log("Fitting map to first route with", routes[0].coordinates.length, "coordinates");
-                    mapRef.current.fitToCoordinates(routes[0].coordinates, {
-                        edgePadding: { top: 50, right: 50, bottom: 590, left: 50 },
-                        animated: true,
-                    });
-                } else {
-                    console.warn("Cannot fit map:", {
-                        hasMapRef: !!mapRef.current,
-                        routesCount: routes.length,
-                        coordinatesCount: routes[0]?.coordinates?.length || 0
-                    });
-                }
-            }
-        };
-        fetchHereRoutes();
-    }, [mapProvider, pickupLocation, dropoffLocation]);
 
     const handleMapReady = () => {
         if (!mapRef.current || !pickupLocation || !dropoffLocation) return;
@@ -593,12 +564,27 @@ export default function ConfirmBookingScreen() {
                                         />
                                     ) : (
                                         <>
-                                            {hereRoutes.length > 0 && (
-                                                <Polyline
-                                                    coordinates={hereRoutes[0].coordinates}
-                                                    strokeColor="#3B82F6"
-                                                    strokeWidth={5}
-                                                />
+                                            {hereRoutes.length > 0 && hereRoutes[0].segments && hereRoutes[0].segments.length > 0 ? (
+                                                hereRoutes[0].segments.map((segment, index) => (
+                                                    <Polyline
+                                                        key={`traffic-segment-${index}`}
+                                                        coordinates={segment.coordinates}
+                                                        strokeColor={segment.color}
+                                                        strokeWidth={10}
+                                                        lineCap="round"
+                                                        lineJoin="round"
+                                                        zIndex={10}
+                                                    />
+                                                ))
+                                            ) : (
+                                                hereRoutes.length > 0 && (
+                                                    <Polyline
+                                                        coordinates={hereRoutes[0].coordinates}
+                                                        strokeColor="#3B82F6"
+                                                        strokeWidth={5}
+                                                        zIndex={10}
+                                                    />
+                                                )
                                             )}
                                         </>
                                     )}
@@ -609,7 +595,25 @@ export default function ConfirmBookingScreen() {
 
                     {/* Driver Markers */}
                     {driverLocations
-                        .filter(driver => selectedVehicle && driver.driver?.vehicle_type === selectedVehicle.id)
+                        .filter(driver => {
+                            // Filter by vehicle type
+                            if (!selectedVehicle || driver.driver?.vehicle_type !== selectedVehicle.id) {
+                                return false;
+                            }
+
+                            // Filter by distance - only show drivers within 2km radius
+                            if (pickupLocation) {
+                                const distance = getDistance(
+                                    pickupLocation.latitude,
+                                    pickupLocation.longitude,
+                                    driver.lat,
+                                    driver.lng
+                                );
+                                return distance <= 2; // 2 kilometers radius
+                            }
+
+                            return true; // If no pickup location, show all (fallback)
+                        })
                         .map((driver) => (
                             <Marker
                                 key={`driver-${driver.id}`}
@@ -712,6 +716,25 @@ export default function ConfirmBookingScreen() {
                                         <Text className="text-gray-500 text-xs" numberOfLines={1}>{dropoffLocation?.address}</Text>
                                     </View>
                                 </View>
+                            </View>
+                        </View>
+
+                        {/* Trip Details (Pets & Passengers) */}
+                        <View className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                            <Text className="font-bold text-gray-800 mb-2">Trip Details</Text>
+
+                            <View className="flex-row items-center mb-2">
+                                <PawPrint size={16} color="#4B5563" />
+                                <Text className="ml-2 text-gray-600 font-medium">
+                                    Pets: <Text className="text-gray-900">{displayPetNames}</Text>
+                                </Text>
+                            </View>
+
+                            <View className="flex-row items-center">
+                                <User size={16} color="#4B5563" />
+                                <Text className="ml-2 text-gray-600 font-medium">
+                                    Passengers: <Text className="text-gray-900">{passengers}</Text>
+                                </Text>
                             </View>
                         </View>
 

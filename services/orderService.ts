@@ -58,7 +58,9 @@ export const orderService = {
         const response = await fetch(url, { headers });
 
         if (!response.ok) {
-            throw new Error('Failed to fetch orders');
+            const errorText = await response.text();
+            console.error('Failed to fetch orders:', response.status, errorText);
+            throw new Error(`Failed to fetch orders: ${response.status} - ${errorText}`);
         }
 
         return await response.json();

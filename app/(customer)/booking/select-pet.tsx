@@ -246,10 +246,10 @@ export default function SelectPetScreen() {
                             pathname: '/(customer)/booking/confirm',
                             params: {
                                 petIds: selectedPets.join(','),
-                                petName: petNames,
+                                petNames: petNames, // Pass all pet names
                                 petType: selectedPetsData[0].type, // Primary pet type
                                 petWeight: totalWeight,
-                                passengerCount: passengerCount
+                                passengers: passengerCount // Pass passenger count
                             }
                         });
                     }}

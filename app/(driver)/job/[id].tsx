@@ -393,10 +393,28 @@ export default function ActiveJobScreen() {
                                     order.pet?.type?.toLowerCase() === 'cat' ? '🐱' : '🐾'}
                             </Text>
                             <View className="flex-1">
-                                <Text className="font-medium text-gray-800">{order.pet?.name}</Text>
-                                <Text className="text-xs text-gray-500">
-                                    {order.pet?.type} {order.pet?.breed ? `• ${order.pet.breed}` : ''} {order.pet?.weight ? `• ${order.pet.weight}kg` : ''}
-                                </Text>
+                                {order.pets && order.pets.length > 0 ? (
+                                    order.pets.map((pet, index) => (
+                                        <View key={pet.id || index} className="mb-1">
+                                            <Text className="font-medium text-gray-800">{pet.name}</Text>
+                                            <Text className="text-xs text-gray-500">
+                                                {pet.type} {pet.breed ? `• ${pet.breed}` : ''} {pet.weight ? `• ${pet.weight}kg` : ''}
+                                            </Text>
+                                        </View>
+                                    ))
+                                ) : (
+                                    <>
+                                        <Text className="font-medium text-gray-800">{order.pet_details || order.pet?.name}</Text>
+                                        <Text className="text-xs text-gray-500">
+                                            {order.pet?.type} {order.pet?.breed ? `• ${order.pet.breed}` : ''} {order.pet?.weight ? `• ${order.pet.weight}kg` : ''}
+                                        </Text>
+                                    </>
+                                )}
+                                {order.passengers && (
+                                    <Text className="text-xs text-gray-500 mt-1">
+                                        Passengers: {order.passengers}
+                                    </Text>
+                                )}
                             </View>
                         </View>
 

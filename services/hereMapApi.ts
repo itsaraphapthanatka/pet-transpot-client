@@ -16,8 +16,6 @@ function decode(encoded: string): LatLng[] {
             latitude: lat,
             longitude: lng
         }));
-
-        console.log(`Decoded ${coordinates.length} coordinates using flexpolyline lib, first:`, coordinates[0], 'last:', coordinates[coordinates.length - 1]);
         return coordinates;
     } catch (error) {
         console.error('Failed to decode polyline:', error);
@@ -25,14 +23,22 @@ function decode(encoded: string): LatLng[] {
     }
 }
 
+export interface HereRouteSegment {
+    coordinates: LatLng[];
+    color: string;
+}
+
 export interface HereRoute {
     coordinates: LatLng[];
+    segments: HereRouteSegment[];
     distance: number; // in meters
     duration: number; // in seconds
     summary: string;
 }
 
+
 export const hereMapApi = {
+    // Simple route for just getting coordinates (e.g. for destination preview)
     getHereRoute: async (
         origin: LatLng,
         destination: LatLng,
@@ -44,7 +50,7 @@ export const hereMapApi = {
 
             const url = `${HERE_ROUTING_API_URL}?transportMode=car&origin=${originStr}&destination=${destStr}&return=polyline&apiKey=${apiKey}`;
 
-            console.log("Fetching HERE Route:", url);
+            // console.log("Fetching HERE Route (Simple):", url);
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -68,6 +74,7 @@ export const hereMapApi = {
         }
     },
 
+    // Get alternatives (complex object)
     getHereRouteAlternatives: async (
         origin: LatLng,
         destination: LatLng,
@@ -81,7 +88,7 @@ export const hereMapApi = {
             // Request alternatives from HERE API
             const url = `${HERE_ROUTING_API_URL}?transportMode=car&origin=${originStr}&destination=${destStr}&return=polyline,summary&alternatives=${maxAlternatives}&apiKey=${apiKey}`;
 
-            console.log("Fetching HERE Route Alternatives:", url);
+            // console.log("Fetching HERE Route Alternatives:", url);
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -90,38 +97,24 @@ export const hereMapApi = {
             }
 
             const data = await response.json();
-            console.log("HERE API Response:", JSON.stringify(data, null, 2));
 
             if (data.routes && data.routes.length > 0) {
                 const routes = data.routes.map((route: any, index: number) => {
                     const section = route.sections[0];
                     const coordinates = section && section.polyline ? decode(section.polyline) : [];
-
-                    // Extract distance and duration
-                    const distance = section?.summary?.length || 0; // in meters
-                    const duration = section?.summary?.duration || 0; // in seconds
-
-                    console.log(`Route ${index + 1}:`, {
-                        coordinatesCount: coordinates.length,
-                        distance,
-                        duration,
-                        firstCoord: coordinates[0],
-                        lastCoord: coordinates[coordinates.length - 1]
-                    });
+                    const distance = section?.summary?.length || 0;
+                    const duration = section?.summary?.duration || 0;
 
                     return {
                         coordinates,
+                        segments: [], // No segments for alternatives to save perf
                         distance,
                         duration,
                         summary: `Route ${index + 1}`
                     };
                 });
-
-                console.log(`Returning ${routes.length} routes`);
                 return routes;
             }
-
-            console.warn("No routes found in HERE API response");
             return [];
         } catch (error) {
             console.error("Failed to fetch HERE route alternatives:", error);
@@ -129,6 +122,7 @@ export const hereMapApi = {
         }
     },
 
+    // Main function for Home Screen with Traffic Segments
     getRoutes: async (
         origin: LatLng,
         destination: LatLng,
@@ -139,10 +133,11 @@ export const hereMapApi = {
             const originStr = `${origin.latitude},${origin.longitude}`;
             const destStr = `${destination.latitude},${destination.longitude}`;
 
-            // Request routes from HERE API with specific mode
-            const url = `${HERE_ROUTING_API_URL}?transportMode=${mode}&origin=${originStr}&destination=${destStr}&return=polyline,summary&apiKey=${apiKey}`;
+            // Request routes from HERE API with specific mode and traffic spans
+            // Ensure spans=dynamicSpeedInfo,length is included!
+            const url = `${HERE_ROUTING_API_URL}?transportMode=${mode}&origin=${originStr}&destination=${destStr}&return=polyline,summary&spans=dynamicSpeedInfo,length&apiKey=${apiKey}`;
 
-            console.log("Fetching HERE Routes with mode:", mode, url);
+            console.log("Fetching HERE Routes with Traffic:", url);
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -155,13 +150,72 @@ export const hereMapApi = {
             if (data.routes && data.routes.length > 0) {
                 const routes = data.routes.map((route: any, index: number) => {
                     const section = route.sections[0];
-                    const coordinates = section && section.polyline ? decode(section.polyline) : [];
+                    const allCoordinates = section && section.polyline ? decode(section.polyline) : [];
 
                     const distance = section?.summary?.length || 0;
                     const duration = section?.summary?.duration || 0;
 
+                    const spans = section?.spans || [];
+                    const segments: HereRouteSegment[] = [];
+
+                    if (spans.length > 0 && allCoordinates.length > 0) {
+                        for (let i = 0; i < spans.length; i++) {
+                            const span = spans[i];
+                            const startIdx = span.offset;
+                            // Ensure endIdx doesn't go out of bounds. 
+                            // If it's the last span, it goes to the end of coordinates.
+                            // If it's not the last span, it goes to the next span's offset.
+                            const endIdx = (i < spans.length - 1) ? spans[i + 1].offset : allCoordinates.length - 1;
+
+                            // Slice including endIdx? 
+                            // slice(start, end) excludes end. 
+                            // We want to connect segments, so we might overlap by 1 point.
+                            // Let's use slice(startIdx, endIdx + 1)
+
+                            const segmentCoords = allCoordinates.slice(startIdx, endIdx + 1);
+
+                            // Safety check
+                            if (segmentCoords.length < 2) continue;
+
+                            // Calculate Traffic Color
+                            let color = '#4285F4'; // Default Google Blue (Clear)
+
+                            if (span.dynamicSpeedInfo) {
+                                const trafficSpeed = span.dynamicSpeedInfo.trafficSpeed;
+                                const baseSpeed = span.dynamicSpeedInfo.baseSpeed;
+
+                                if (baseSpeed > 0) {
+                                    const ratio = trafficSpeed / baseSpeed;
+                                    console.log(`Span Traffic: traffic=${trafficSpeed}, base=${baseSpeed}, ratio=${ratio.toFixed(2)}`);
+
+                                    // Standard Sensitivity
+                                    if (ratio < 0.50) {
+                                        color = '#ef4444'; // Red (Traffic)
+                                    } else if (ratio < 0.85) {
+                                        color = '#eab308'; // Yellow (Moderate)
+                                    }
+                                }
+                            }
+
+                            segments.push({
+                                coordinates: segmentCoords,
+                                color: color
+                            });
+                        }
+                    } else {
+                        console.log("No Spans Found in Response!");
+                        // If no spans returned, just use the whole line as one blue segment
+                        segments.push({
+                            coordinates: allCoordinates,
+                            color: '#4285F4'
+                        });
+                    }
+
+                    console.log(`Calculated ${segments.length} traffic segments`);
+
                     return {
-                        coordinates,
+                        coordinates: allCoordinates,
+                        segments: segments,
                         distance,
                         duration,
                         summary: `Route ${index + 1}`
@@ -177,4 +231,3 @@ export const hereMapApi = {
         }
     }
 };
-

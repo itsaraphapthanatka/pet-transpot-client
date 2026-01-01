@@ -1,24 +1,54 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { AppButton } from '../../../components/ui/AppButton';
-import { User, LogOut, ChevronRight, Settings, Shield, Bell } from 'lucide-react-native';
+import { User, LogOut, ChevronRight, Settings, Shield, History, TrendingUp } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { api } from '../../../services/api';
 
 export default function DriverProfileScreen() {
     const { user, logout } = useAuthStore();
-    console.log('useccr', user);
+    const [stats, setStats] = useState({ rating: 0, total_trips: 0, years_active: 0 });
+    const [loadingStats, setLoadingStats] = useState(true);
+
+    useEffect(() => {
+        fetchDriverStats();
+    }, []);
+
+    const fetchDriverStats = async () => {
+        try {
+            const data = await api.getDriverStats();
+            setStats(data);
+        } catch (error) {
+            console.error('Failed to fetch driver stats:', error);
+        } finally {
+            setLoadingStats(false);
+        }
+    };
 
     const handleLogout = () => {
         logout();
         router.replace('/');
     };
 
+    const handleNavigateToSettings = () => {
+        router.push('/(driver)/settings');
+    };
+
+    const handleNavigateToHistory = () => {
+        router.push('/(driver)/history');
+    };
+
+    const handleNavigateToEarnings = () => {
+        router.push('/(driver)/earnings');
+    };
+
     const menuItems = [
-        { icon: Settings, label: 'Settings', screen: 'settings' },
+        { icon: TrendingUp, label: 'สรุปรายได้', screen: 'earnings', onPress: handleNavigateToEarnings },
+        { icon: History, label: 'ประวัติรับงาน', screen: 'history', onPress: handleNavigateToHistory },
+        { icon: Settings, label: 'Settings', screen: 'settings', onPress: handleNavigateToSettings },
         { icon: Shield, label: 'Privacy & Security', screen: 'privacy' },
-        { icon: Bell, label: 'Notifications', screen: 'notifications' },
     ];
 
     return (
@@ -43,15 +73,21 @@ export default function DriverProfileScreen() {
                 {/* Stats */}
                 <View className="flex-row justify-between mb-8">
                     <View className="flex-1 bg-white p-4 rounded-xl shadow-sm items-center mr-2">
-                        <Text className="text-2xl font-bold text-gray-800">4.9</Text>
+                        <Text className="text-2xl font-bold text-gray-800">
+                            {loadingStats ? '-' : stats.rating.toFixed(1)}
+                        </Text>
                         <Text className="text-gray-500 text-xs text-center">Rating</Text>
                     </View>
                     <View className="flex-1 bg-white p-4 rounded-xl shadow-sm items-center mx-2">
-                        <Text className="text-2xl font-bold text-gray-800">150</Text>
+                        <Text className="text-2xl font-bold text-gray-800">
+                            {loadingStats ? '-' : stats.total_trips}
+                        </Text>
                         <Text className="text-gray-500 text-xs text-center">Trips</Text>
                     </View>
                     <View className="flex-1 bg-white p-4 rounded-xl shadow-sm items-center ml-2">
-                        <Text className="text-2xl font-bold text-gray-800">2</Text>
+                        <Text className="text-2xl font-bold text-gray-800">
+                            {loadingStats ? '-' : stats.years_active}
+                        </Text>
                         <Text className="text-gray-500 text-xs text-center">Years</Text>
                     </View>
                 </View>
@@ -61,6 +97,7 @@ export default function DriverProfileScreen() {
                     {menuItems.map((item, index) => (
                         <TouchableOpacity
                             key={index}
+                            onPress={item.onPress}
                             className={`flex-row items-center p-4 ${index !== menuItems.length - 1 ? 'border-b border-gray-100' : ''}`}
                         >
                             <View className="bg-gray-100 p-2 rounded-full mr-4">
