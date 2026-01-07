@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { AppButton } from '../../../../../components/ui/AppButton';
-import { formatPrice } from '../../../../../utils/format';
+import { AppButton } from '../../../../components/ui/AppButton';
+import { formatPrice } from '../../../../utils/format';
 export function BookingBottomSheet({
     distance,
     duration,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity } from 'react-native';
-import { formatPrice } from '../../../../../utils/format';
+import { formatPrice } from '../../../../utils/format';
 
 export function VehicleSelector({
     vehicles,

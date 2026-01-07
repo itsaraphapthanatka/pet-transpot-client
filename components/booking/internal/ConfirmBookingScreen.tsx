@@ -4,13 +4,13 @@ import { BookingBottomSheet } from "./components/BookingBottomSheet";
 import { RouteSelector } from "./components/RouteSelector";
 import { VehicleSelector } from "./components/VehicleSelector";
 import { BookingMap } from "./components/BookingMap";
-import { useBookingStore } from "../../../../store/useBookingStore";
+import { useBookingStore } from "../../../store/useBookingStore";
 import { useLocalSearchParams } from "expo-router";
 import { useState, useRef } from "react";
 import { View } from "react-native";
 import MapView from "react-native-maps";
-import { MOCK_RIDE_OPTIONS } from "../../../../utils/mockData";
-import { api } from "../../../../services/api";
+import { MOCK_RIDE_OPTIONS } from "../../../utils/mockData";
+import { api } from "../../../services/api";
 
 export default function ConfirmBookingScreen() {
     const mapRef = useRef<MapView>(null);

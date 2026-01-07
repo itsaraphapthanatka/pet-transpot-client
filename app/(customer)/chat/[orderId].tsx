@@ -64,8 +64,13 @@ export default function ChatScreen() {
                 if (data.type === "typing") {
                     setTyping(data.is_typing);
                 } else {
-                    // Assume it's a message if not typing
-                    addMessage(data);
+                    // Map fields for consistency with state and deduplication
+                    const normalizedMsg = {
+                        ...data,
+                        user_id: data.user_id || data.sender_id,
+                        role: data.role || data.sender_role
+                    };
+                    addMessage(normalizedMsg);
                 }
             }
         );

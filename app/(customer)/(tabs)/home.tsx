@@ -305,7 +305,11 @@ export default function CustomerHome() {
             >
                 {/* Pickup Marker */}
                 {pickupLocation && (
-                    <Marker coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }} title={t('ตำแหน่งของคุณ') || 'Pickup'}>
+                    <Marker
+                        coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }}
+                        title={t('ตำแหน่งของคุณ') || 'Pickup'}
+                        anchor={{ x: 0.5, y: 1 }}
+                    >
                         <View className="bg-blue-500 p-1.5 rounded-full border border-white shadow-sm">
                             <MapPin size={16} color="white" />
                         </View>
@@ -314,7 +318,11 @@ export default function CustomerHome() {
 
                 {/* Dropoff Marker */}
                 {dropoffLocation && (
-                    <Marker coordinate={{ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }} title={t('สถานที่ปลายทาง') || 'Dropoff'}>
+                    <Marker
+                        coordinate={{ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }}
+                        title={t('สถานที่ปลายทาง') || 'Dropoff'}
+                        anchor={{ x: 0.5, y: 1 }}
+                    >
                         <View className="bg-red-500 p-1.5 rounded-full border border-white shadow-sm">
                             <MapPin size={16} color="white" />
                         </View>

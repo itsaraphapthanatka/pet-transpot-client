@@ -626,7 +626,10 @@ export default function ConfirmBookingScreen() {
                         <>
                             {/* Pickup Marker - Always show if idle, or as Destination if confirmed */}
                             {(pickupLocation && (bookingStatus === 'idle' || bookingStatus === 'confirmed')) && (
-                                <Marker coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }}>
+                                <Marker
+                                    coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }}
+                                    anchor={{ x: 0.5, y: 1 }}
+                                >
                                     <View className="bg-white p-1 rounded-full border border-blue-500 shadow-sm">
                                         <View className="w-2 h-2 bg-blue-500 rounded-full" />
                                     </View>
@@ -635,7 +638,10 @@ export default function ConfirmBookingScreen() {
 
                             {/* Dropoff Marker - Hide if Driver is approaching (confirmed) */}
                             {(dropoffLocation && bookingStatus === 'idle') && (
-                                <Marker coordinate={{ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }}>
+                                <Marker
+                                    coordinate={{ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }}
+                                    anchor={{ x: 0.5, y: 1 }}
+                                >
                                     <View className="bg-white p-1 rounded-full border border-red-500 shadow-sm">
                                         <View className="w-2 h-2 bg-red-500 rounded-full" />
                                     </View>

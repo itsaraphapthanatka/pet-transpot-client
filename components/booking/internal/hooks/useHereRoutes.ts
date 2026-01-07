@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { hereMapApi, HereRoute } from '../../../../../services/hereMapApi';
+import { hereMapApi, HereRoute } from '../../../../services/hereMapApi';
 
 const HERE_MAPS_API_KEY = process.env.EXPO_PUBLIC_HERE_MAP_KEY as string;
 
