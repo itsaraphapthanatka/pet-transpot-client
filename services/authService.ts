@@ -11,7 +11,7 @@ import {
 } from '../types/auth';
 
 const getBaseUrl = () => {
-    let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.133:8000';
+    let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.140:8000';
     if (Platform.OS === 'android' && (url.includes('localhost') || url.includes('127.0.0.1'))) {
         return url.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
     }
@@ -61,7 +61,7 @@ export const authService = {
             formData.append('username', username);
             formData.append('password', password);
 
-            const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            const response = await fetch(`${API_BASE_URL}/auth/driver/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -153,7 +153,11 @@ export const authService = {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ phone_number: phoneNumber, otp }),
+                body: JSON.stringify({
+                    phone_number: phoneNumber,
+                    otp,
+                    role: 'driver'
+                }),
             });
 
             if (!response.ok) {

@@ -81,7 +81,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const getBaseUrl = () => {
-    let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.133:8000';
+    let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.140:8000';
     if (Platform.OS === 'android' && (url.includes('localhost') || url.includes('127.0.0.1'))) {
         return url.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
     }
@@ -394,7 +394,10 @@ export const api = {
             headers,
             body: JSON.stringify(data)
         });
-        if (!response.ok) throw new Error('Failed to create payment intent');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Failed to create payment intent' }));
+            throw new Error(errorData.detail || 'Failed to create payment intent');
+        }
         return response.json();
     },
 
@@ -463,5 +466,52 @@ export const api = {
         });
         if (!response.ok) throw new Error('Failed to detach payment method');
         return response.json();
+    },
+
+    updateDriverBank: async (bankData: { bank_name: string, bank_account_number: string, bank_account_name: string }): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/drivers/bank-account`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(bankData)
+        });
+        if (!response.ok) throw new Error('Failed to update bank account');
+        return response.json();
+    },
+
+    requestWithdrawal: async (amount: number): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/wallet/withdraw`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ amount })
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to request withdrawal');
+        }
+        return response.json();
+    },
+
+    getActiveOrder: async (): Promise<any | null> => {
+        try {
+            const headers = await getAuthHeaders();
+            const response = await fetch(`${API_BASE_URL}/orders/`, { headers });
+
+            if (!response.ok) {
+                console.error('Failed to fetch orders for active check');
+                return null;
+            }
+
+            const orders = await response.json();
+            const activeStatuses = ['accepted', 'arrived', 'picked_up', 'in_progress'];
+
+            // Find any order that is currently active for this driver
+            const activeOrder = orders.find((o: any) => activeStatuses.includes(o.status));
+            return activeOrder || null;
+        } catch (error) {
+            console.error('Error fetching active order:', error);
+            return null;
+        }
     }
 };
