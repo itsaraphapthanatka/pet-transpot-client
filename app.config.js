@@ -2,19 +2,28 @@ export default ({ config }) => ({
     ...config,
     ios: {
         ...config.ios,
+        bundleIdentifier: config.ios?.bundleIdentifier || "com.petgo.petgo",
         config: {
             ...config.ios?.config,
-            googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0",
+            googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || config.ios?.config?.googleMapsApiKey,
         },
     },
     android: {
         ...config.android,
+        package: config.android?.package || "com.petgo.petgo",
         config: {
             ...config.android?.config,
             googleMaps: {
                 ...config.android?.config?.googleMaps,
-                apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0",
+                apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || config.android?.config?.googleMaps?.apiKey,
             },
+        },
+    },
+
+    extra: {
+        ...(config.extra ?? {}),
+        eas: {
+            projectId: "fe18173f-c822-4d80-9c28-c1132877d6e7",
         },
     },
 });

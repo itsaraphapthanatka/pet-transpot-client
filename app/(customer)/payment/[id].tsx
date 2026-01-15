@@ -26,6 +26,8 @@ function CustomerPaymentScreen() {
     const [payment, setPayment] = useState<PaymentResponse | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [hasAttemptedAutoPay, setHasAttemptedAutoPay] = useState(false);
+    const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
     const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
     const fetchData = async () => {
@@ -125,8 +127,9 @@ function CustomerPaymentScreen() {
                 // 4. Success! Verify with backend
                 try {
                     // Update our internal payment record if it exists
-                    if (payment) {
-                        await api.verifyPayment(payment.id, 'successful');
+                    const currentPayment = payment || await api.getPaymentByOrderId(Number(id)).catch(() => null);
+                    if (currentPayment) {
+                        await api.verifyPayment(currentPayment.id, 'successful');
                     }
                     Alert.alert('Success', 'Payment successful!');
                     fetchData();
@@ -142,6 +145,75 @@ function CustomerPaymentScreen() {
             setIsProcessing(false);
         }
     };
+
+    // Auto-trigger Stripe payment if it's a stripe order and not yet paid
+    useEffect(() => {
+        if (!isLoading && order && order.payment_method === 'stripe' && order.payment_status !== 'paid' && !hasAttemptedAutoPay) {
+            setHasAttemptedAutoPay(true);
+
+            const attemptCharge = async () => {
+                // If we have a saved card ID, try background charge first (true automation)
+                if (order.stripe_payment_method_id) {
+                    setIsProcessing(true);
+                    try {
+                        const result = await api.chargeSavedCard(order.id, order.stripe_payment_method_id);
+                        if (result.status === 'success') {
+                            Alert.alert("Success", "Payment successful!");
+                            fetchData();
+                            return;
+                        } else {
+                            // Requires action (e.g. 3D Secure) - fallback to sheet
+                            handleStripePayment();
+                        }
+                    } catch (error) {
+                        console.log("Background charge failed, falling back to sheet:", error);
+                        handleStripePayment();
+                    } finally {
+                        setIsProcessing(false);
+                    }
+                } else {
+                    // No saved card ID, show sheet immediately
+                    handleStripePayment();
+                }
+            };
+
+            attemptCharge();
+        }
+    }, [isLoading, order, hasAttemptedAutoPay]);
+
+    // Auto-fetch PromptPay QR if needed
+    useEffect(() => {
+        if (!isLoading && order && order.payment_method === 'promptpay' && order.payment_status !== 'paid' && !qrCodeUrl) {
+            const getPromptPayQR = async () => {
+                try {
+                    const result = await api.createPaymentIntent({
+                        order_id: order.id,
+                        amount: order.price || 0,
+                        method: 'promptpay'
+                    });
+                    if (result.qr_code_url) {
+                        setQrCodeUrl(result.qr_code_url);
+                    }
+                } catch (error) {
+                    console.error("Failed to get PromptPay QR:", error);
+                }
+            };
+            getPromptPayQR();
+        }
+    }, [isLoading, order, qrCodeUrl]);
+
+    // Polling for status if PromptPay
+    useEffect(() => {
+        let interval: any;
+        if (order && order.payment_method === 'promptpay' && order.payment_status !== 'paid') {
+            interval = setInterval(() => {
+                fetchData();
+            }, 5000);
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [order?.payment_status, order?.payment_method]);
 
     if (isLoading) {
         return (
@@ -245,10 +317,18 @@ function CustomerPaymentScreen() {
                         {order.payment_method === 'promptpay' ? (
                             <>
                                 <View className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm mb-6">
-                                    <Image
-                                        source={{ uri: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PETTRANSPORT-PAYMENT' }}
-                                        style={{ width: 250, height: 250 }}
-                                    />
+                                    {qrCodeUrl ? (
+                                        <Image
+                                            source={{ uri: qrCodeUrl }}
+                                            style={{ width: 250, height: 250 }}
+                                            resizeMode="contain"
+                                        />
+                                    ) : (
+                                        <View style={{ width: 250, height: 250, justifyContent: 'center', alignItems: 'center' }}>
+                                            <ActivityIndicator size="large" color="#00A862" />
+                                            <Text className="mt-2 text-gray-400">กำลังเตรียม QR Code...</Text>
+                                        </View>
+                                    )}
                                 </View>
                                 <Text className="text-gray-500 text-center mb-8">สแกน QR Code ด้านบนเพื่อชำระเงินผ่าน PromptPay</Text>
 

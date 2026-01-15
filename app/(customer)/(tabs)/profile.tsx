@@ -21,7 +21,7 @@ export default function ProfileScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-gray-50">
+        <SafeAreaView className="flex-1 bg-gray-50" edges={['top', 'left', 'right']}>
             <View className="p-6 bg-white shadow-sm mb-4">
                 <Text className="text-2xl font-bold text-gray-900">{t('profile')}</Text>
                 <Text className="text-gray-500 mt-1">{user?.full_name || t('home_screen.guest')}</Text>

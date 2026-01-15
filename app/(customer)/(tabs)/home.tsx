@@ -12,6 +12,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { MOCK_RIDE_OPTIONS } from '../../../utils/mockData';
 import { router } from 'expo-router';
 import { api, DriverLocation } from '../../../services/api';
+import { orderService } from '../../../services/orderService';
 
 import { LocationSearch, SearchResult } from '../../../components/LocationSearch';
 import { longdoMapApi } from '../../../services/longdoMapApi';
@@ -56,10 +57,39 @@ export default function CustomerHome() {
 
     const LONGDO_API_KEY = process.env.EXPO_PUBLIC_LONGDO_MAP_API_KEY || '';
 
-    // Initialize pickup with current location
+    // Initialize pickup with current location and check for active order
     React.useEffect(() => {
         (async () => {
-            // Basic permission check
+            // 1. Check for Active Order
+            if (user?.id) {
+                const activeOrder = await orderService.getActiveOrder(user.id);
+                if (activeOrder) {
+                    console.log("Found active order:", activeOrder.id);
+
+                    // Hydrate Store
+                    setPickupLocation({
+                        name: activeOrder.pickup_address,
+                        address: activeOrder.pickup_address,
+                        latitude: activeOrder.pickup_lat,
+                        longitude: activeOrder.pickup_lng
+                    });
+                    setDropoffLocation({
+                        name: activeOrder.dropoff_address,
+                        address: activeOrder.dropoff_address,
+                        latitude: activeOrder.dropoff_lat,
+                        longitude: activeOrder.dropoff_lng
+                    });
+
+                    // Redirect to Confirm Screen with orderId
+                    router.push({
+                        pathname: '/(customer)/booking/confirm',
+                        params: { orderId: activeOrder.id }
+                    });
+                    return; // Stop further initialization
+                }
+            }
+
+            // 2. Basic permission check & current location (only if no active order)
             const { status } = await Location.getForegroundPermissionsAsync();
             if (status === 'granted' && !pickupLocation) {
                 const location = await Location.getCurrentPositionAsync({});
@@ -71,11 +101,19 @@ export default function CustomerHome() {
                     longitude: location.coords.longitude
                 });
                 setPickupQuery(initialName);
-            } else if (pickupLocation) {
-                setPickupQuery(pickupLocation.name || '');
             }
         })();
-    }, []);
+    }, [user?.id]); // Add user?.id dependency
+
+    // Sync local state with Booking Store (When returning from Map Picker)
+    React.useEffect(() => {
+        if (pickupLocation) {
+            setPickupQuery(pickupLocation.name || pickupLocation.address || '');
+        }
+        if (dropoffLocation) {
+            setDropoffQuery(dropoffLocation.name || dropoffLocation.address || '');
+        }
+    }, [pickupLocation, dropoffLocation]);
 
     // Debounced Search
     React.useEffect(() => {
@@ -110,7 +148,6 @@ export default function CustomerHome() {
             searchPlaces();
         }, 800);
 
-        return () => clearTimeout(timeoutId);
         return () => clearTimeout(timeoutId);
     }, [pickupQuery, dropoffQuery, activeField]);
 
@@ -308,7 +345,7 @@ export default function CustomerHome() {
                     <Marker
                         coordinate={{ latitude: pickupLocation.latitude, longitude: pickupLocation.longitude }}
                         title={t('ตำแหน่งของคุณ') || 'Pickup'}
-                        anchor={{ x: 0.5, y: 1 }}
+                        anchor={{ x: 0.5, y: 0.5 }}
                     >
                         <View className="bg-blue-500 p-1.5 rounded-full border border-white shadow-sm">
                             <MapPin size={16} color="white" />
@@ -321,7 +358,7 @@ export default function CustomerHome() {
                     <Marker
                         coordinate={{ latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude }}
                         title={t('สถานที่ปลายทาง') || 'Dropoff'}
-                        anchor={{ x: 0.5, y: 1 }}
+                        anchor={{ x: 0.5, y: 0.5 }}
                     >
                         <View className="bg-red-500 p-1.5 rounded-full border border-white shadow-sm">
                             <MapPin size={16} color="white" />
@@ -384,9 +421,7 @@ export default function CustomerHome() {
 
             </MapView>
 
-            <SafeAreaView className="absolute top-0 w-full px-5 pt-2 flex-row justify-between items-center z-10 pointer-events-none" style={{ display: 'none' }}>
-                {/* Hiding the top bar to make room for Search Input for now, or just move it down */}
-
+            <SafeAreaView className="absolute top-0 w-full px-5 pt-12 flex-row justify-between items-center z-10">
                 <View className="flex-row items-center bg-white/90 p-2 pr-4 rounded-full shadow-md backdrop-blur-md">
                     <View className="w-8 h-8 bg-green-100 rounded-full items-center justify-center mr-2">
                         <Text className="text-lg">👤</Text>
@@ -397,7 +432,10 @@ export default function CustomerHome() {
                     </View>
                 </View>
 
-                <TouchableOpacity className="bg-white p-2.5 rounded-full shadow-md">
+                <TouchableOpacity
+                    className="bg-white p-2.5 rounded-full shadow-md"
+                    onPress={() => router.push('/(customer)/notifications')}
+                >
                     <Bell size={20} color="black" />
                 </TouchableOpacity>
             </SafeAreaView>

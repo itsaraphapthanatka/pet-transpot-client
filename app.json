@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "pet-transpot-client",
-    "slug": "pet-transpot-client",
-    "scheme": "pet-transport",
+    "name": "petgo",
+    "slug": "petgo",
+    "owner": "realsung6",
+    "scheme": "petgo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -18,7 +19,7 @@
       "config": {
         "googleMapsApiKey": "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0"
       },
-      "bundleIdentifier": "com.anonymous.pettranspotclient",
+      "bundleIdentifier": "com.petgo.petgo",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -35,7 +36,7 @@
           "apiKey": "AIzaSyDKQzAl_-qFOsxqp4Wq2aobo41GyGjtEw0"
         }
       },
-      "package": "com.anonymous.pettranspotclient",
+      "package": "com.petgo.petgo",
       "usesCleartextTraffic": true
     },
     "web": {
@@ -54,7 +55,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "619b4425-35b0-4beb-bb20-f16e160eadb5"
+        "projectId": "fe18173f-c822-4d80-9c28-c1132877d6e7"
       }
     }
   }

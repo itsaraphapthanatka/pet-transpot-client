@@ -134,7 +134,7 @@ export default function WalletScreen() {
     }
 
     return (
-        <SafeAreaView className="flex-1 bg-white">
+        <SafeAreaView className="flex-1 bg-white" edges={['top', 'left', 'right']}>
             <View className="px-6 py-4">
                 <Text className="text-3xl font-black text-gray-900">วอลเล็ท</Text>
             </View>
@@ -175,12 +175,12 @@ export default function WalletScreen() {
                         </View>
                         <Text className="text-gray-900 font-bold text-xs">ผูกบัตร</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity className="flex-1 bg-gray-50 p-4 rounded-2xl items-center">
+                    {/* <TouchableOpacity className="flex-1 bg-gray-50 p-4 rounded-2xl items-center">
                         <View className="w-10 h-10 bg-orange-100 rounded-full items-center justify-center mb-2">
                             <Clock size={20} color="#F97316" />
                         </View>
                         <Text className="text-gray-900 font-bold text-xs">ถอนเงิน</Text>
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
                 </View>
 
                 {/* Transactions History */}

@@ -134,6 +134,12 @@ export default function LoginScreen() {
                         </TouchableOpacity>
                     </View>
 
+                    <View className="items-center mt-8 mb-4">
+                        <Text className="text-[10px] text-gray-400 font-medium">
+                            API: {process.env.EXPO_PUBLIC_API_BASE_URL}
+                        </Text>
+                    </View>
+
                 </ScrollView>
             </KeyboardAvoidingView>
 

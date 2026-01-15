@@ -81,7 +81,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const getBaseUrl = () => {
-    let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.133:8000';
+    let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.140:8000';
     if (Platform.OS === 'android' && (url.includes('localhost') || url.includes('127.0.0.1'))) {
         return url.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
     }
@@ -394,7 +394,10 @@ export const api = {
             headers,
             body: JSON.stringify(data)
         });
-        if (!response.ok) throw new Error('Failed to create payment intent');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Failed to create payment intent' }));
+            throw new Error(errorData.detail || 'Failed to create payment intent');
+        }
         return response.json();
     },
 
@@ -462,6 +465,18 @@ export const api = {
             headers
         });
         if (!response.ok) throw new Error('Failed to detach payment method');
+        return response.json();
+    },
+    chargeSavedCard: async (orderId: number, paymentMethodId: string): Promise<any> => {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_BASE_URL}/payments/charge-card?order_id=${orderId}&payment_method_id=${paymentMethodId}`, {
+            method: 'POST',
+            headers
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Charge failed: ${errorText}`);
+        }
         return response.json();
     }
 };

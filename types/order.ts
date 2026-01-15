@@ -52,6 +52,7 @@ export interface Order {
     customer_lng?: number;
     payment_status?: string;
     payment_method?: string;
+    stripe_payment_method_id?: string | null;
     created_at: string;
     pet: PetOut;
     pets: PetOut[]; // New array
@@ -76,4 +77,5 @@ export interface OrderCreate {
     customer_lng?: number;
     payment_status?: string;
     payment_method?: string;
+    stripe_payment_method_id?: string;
 }

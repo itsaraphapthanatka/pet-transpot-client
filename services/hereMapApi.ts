@@ -158,6 +158,14 @@ export const hereMapApi = {
                     const spans = section?.spans || [];
                     const segments: HereRouteSegment[] = [];
 
+                    // GAP FIX: Visual line from Origin to Start of Route
+                    if (origin && allCoordinates.length > 0) {
+                        segments.push({
+                            coordinates: [origin, allCoordinates[0]],
+                            color: '#4285F4' // Same blue as safe route
+                        });
+                    }
+
                     if (spans.length > 0 && allCoordinates.length > 0) {
                         for (let i = 0; i < spans.length; i++) {
                             const span = spans[i];
@@ -186,7 +194,7 @@ export const hereMapApi = {
 
                                 if (baseSpeed > 0) {
                                     const ratio = trafficSpeed / baseSpeed;
-                                    console.log(`Span Traffic: traffic=${trafficSpeed}, base=${baseSpeed}, ratio=${ratio.toFixed(2)}`);
+                                    // console.log(`Span Traffic: traffic=${trafficSpeed}, base=${baseSpeed}, ratio=${ratio.toFixed(2)}`);
 
                                     // Standard Sensitivity
                                     if (ratio < 0.50) {
@@ -211,10 +219,18 @@ export const hereMapApi = {
                         });
                     }
 
-                    console.log(`Calculated ${segments.length} traffic segments`);
+                    // GAP FIX: Visual line from End to Destination
+                    if (destination && allCoordinates.length > 0) {
+                        segments.push({
+                            coordinates: [allCoordinates[allCoordinates.length - 1], destination],
+                            color: '#4285F4'
+                        });
+                    }
+
+                    console.log(`Calculated ${segments.length} traffic segments with gaps filled`);
 
                     return {
-                        coordinates: allCoordinates,
+                        coordinates: allCoordinates, // Keeping original for strict logic if needed
                         segments: segments,
                         distance,
                         duration,

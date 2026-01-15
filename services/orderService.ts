@@ -93,7 +93,7 @@ export const orderService = {
     },
 
     // Driver accepts an order
-    acceptOrder: async (orderId: number): Promise<Order> => {
+    async acceptOrder(orderId: number): Promise<Order> {
         const headers = await getAuthHeaders();
 
         // Use the specific endpoint for accepting orders
@@ -219,5 +219,20 @@ export const orderService = {
             throw new Error(error.detail || 'Failed to pay with wallet');
         }
         return response.json();
+    },
+
+    getActiveOrder: async (userId: number): Promise<Order | null> => {
+        try {
+            // Fetch all orders for the user
+            const orders = await orderService.getOrders();
+            // Filter for active status
+            const activeStatuses = ['pending', 'accepted', 'arrived', 'picked_up', 'in_progress'];
+            // Find the most recent active order (assuming API returns sorted or we just take first found)
+            const activeOrder = orders.find(o => activeStatuses.includes(o.status));
+            return activeOrder || null;
+        } catch (error) {
+            console.error('Error fetching active order:', error);
+            return null;
+        }
     }
 };
