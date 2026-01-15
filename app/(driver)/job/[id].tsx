@@ -4,6 +4,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { AppButton } from '../../../components/ui/AppButton';
 import { Phone, MessageCircle, ArrowLeft, Navigation as NavIcon, User, Wallet, CreditCard, XCircle } from 'lucide-react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { PetGoCarIcon } from '../../../components/icons/PetGoCarIcon';
 import { useJobStore } from '../../../store/useJobStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { orderService } from '../../../services/orderService';
@@ -399,10 +400,9 @@ export default function ActiveJobScreen() {
                         <Marker
                             coordinate={currentLocation}
                             title="You"
+                            anchor={{ x: 0.5, y: 0.5 }}
                         >
-                            <View className="bg-white p-1 rounded-full border border-blue-600 shadow-sm">
-                                <View className="w-3 h-3 bg-blue-600 rounded-full" />
-                            </View>
+                            <PetGoCarIcon width={40} height={40} />
                         </Marker>
                     )}
                     <Marker

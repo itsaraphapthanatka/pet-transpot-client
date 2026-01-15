@@ -467,7 +467,7 @@ export const api = {
         if (!response.ok) throw new Error('Failed to detach payment method');
         return response.json();
     },
-<<<<<<< HEAD
+
     chargeSavedCard: async (orderId: number, paymentMethodId: string): Promise<any> => {
         const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE_URL}/payments/charge-card?order_id=${orderId}&payment_method_id=${paymentMethodId}`, {
@@ -479,7 +479,7 @@ export const api = {
             throw new Error(`Charge failed: ${errorText}`);
         }
         return response.json();
-=======
+    },
 
     updateDriverBank: async (bankData: { bank_name: string, bank_account_number: string, bank_account_name: string }): Promise<any> => {
         const headers = await getAuthHeaders();
@@ -526,6 +526,5 @@ export const api = {
             console.error('Error fetching active order:', error);
             return null;
         }
->>>>>>> 84c5a5c (feat: Configure app as petgo-driver, update authenticated navigation, and enhance chat message deduplication logic.)
     }
 };

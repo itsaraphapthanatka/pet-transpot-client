@@ -221,15 +221,6 @@ export const orderService = {
         return response.json();
     },
 
-<<<<<<< HEAD
-    getActiveOrder: async (userId: number): Promise<Order | null> => {
-        try {
-            // Fetch all orders for the user
-            const orders = await orderService.getOrders();
-            // Filter for active status
-            const activeStatuses = ['pending', 'accepted', 'arrived', 'picked_up', 'in_progress'];
-            // Find the most recent active order (assuming API returns sorted or we just take first found)
-=======
     confirmPayment: async (orderId: number): Promise<Order> => {
         const headers = await getAuthHeaders();
         const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
@@ -260,7 +251,6 @@ export const orderService = {
             const activeStatuses = ['accepted', 'arrived', 'picked_up', 'in_progress'];
 
             // Find any order that is currently active for this driver
->>>>>>> 84c5a5c (feat: Configure app as petgo-driver, update authenticated navigation, and enhance chat message deduplication logic.)
             const activeOrder = orders.find(o => activeStatuses.includes(o.status));
             return activeOrder || null;
         } catch (error) {

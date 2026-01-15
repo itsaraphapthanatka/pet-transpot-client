@@ -305,10 +305,9 @@ export default function DriverHomeScreen() {
                         onPress={() => handleDeclineJob(job.id)}
                     />
                     <AppButton
-                        title={acceptingJobId === job.id ? "Accepting..." : "Accept"}
+                        title="ดูรายละเอียด"
                         className="flex-1"
-                        onPress={() => handleAcceptJob(job)}
-                        disabled={acceptingJobId !== null}
+                        onPress={() => router.push(`/(driver)/job-preview/${job.id}`)}
                     />
                 </View>
             </View>

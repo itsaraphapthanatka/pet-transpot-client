@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
+import { PetGoCarIcon } from '../../../components/icons/PetGoCarIcon';
 import { useTranslation } from 'react-i18next';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppButton } from '../../../components/ui/AppButton';
@@ -823,16 +824,7 @@ export default function ConfirmBookingScreen() {
                                 description={`Plate: ${driver.driver?.vehicle_plate || '-'}`}
                                 anchor={{ x: 0.5, y: 0.5 }}
                             >
-                                <View className="bg-white p-1 rounded-full border border-green-500 shadow-sm">
-                                    {/* Use driver's actual vehicle type for icon (though filtered, so matches selected) */}
-                                    {driver.driver?.vehicle_type === 'suv' ? (
-                                        <Bike size={16} color="#00A862" />
-                                    ) : driver.driver?.vehicle_type === 'van' ? (
-                                        <Truck size={16} color="#FF9100" />
-                                    ) : (
-                                        <Car size={16} color="#2962FF" />
-                                    )}
-                                </View>
+                                <PetGoCarIcon width={40} height={40} />
                             </Marker>
                         ))}
                 </MapView>
@@ -1169,8 +1161,8 @@ export default function ConfirmBookingScreen() {
                         {(currentOrder?.status === 'in_progress' || currentOrder?.status === 'picked_up' || currentOrder?.status === 'completed') && currentOrder?.payment_status !== 'paid' && (
                             <TouchableOpacity
                                 className={`w-full py-4 rounded-xl flex-row justify-center items-center mb-4 ${(paymentMethod === 'cash' && currentOrder?.status !== 'completed')
-                                        ? 'bg-gray-400'
-                                        : 'bg-blue-600'
+                                    ? 'bg-gray-400'
+                                    : 'bg-blue-600'
                                     }`}
                                 onPress={() => router.push(`/(customer)/payment/${currentOrder?.id}`)}
                                 disabled={paymentMethod === 'cash' && currentOrder?.status !== 'completed'}

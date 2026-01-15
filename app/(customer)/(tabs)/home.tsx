@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Image, Platform, StyleSheet }
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
+import { PetGoCarIcon } from '../../../components/icons/PetGoCarIcon';
 
 
 import { AppMapView } from '../../../components/AppMapView';
@@ -407,15 +408,7 @@ export default function CustomerHome() {
                         title={driver.driver?.user?.full_name || "Driver"}
                         anchor={{ x: 0.5, y: 0.5 }}
                     >
-                        <View className="bg-white p-1 rounded-full border border-green-500 shadow-sm">
-                            {driver.driver?.vehicle_type === 'suv' ? (
-                                <Bike size={16} color="#00A862" />
-                            ) : driver.driver?.vehicle_type === 'van' ? (
-                                <Truck size={16} color="#FF9100" />
-                            ) : (
-                                <Car size={16} color="#2962FF" />
-                            )}
-                        </View>
+                        <PetGoCarIcon width={40} height={40} />
                     </Marker>
                 ))}
 
