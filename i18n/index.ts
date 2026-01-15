@@ -6,7 +6,7 @@ const resources = {
     en: {
         translation: {
             welcome: "Welcome to Pet Transport",
-            login: "PetGo Driver",
+            login: "PetGo",
             register: "Register",
             home: "Home",
             profile: "Profile",
@@ -38,7 +38,7 @@ const resources = {
                 get_started: "Get Started"
             },
             login_screen: {
-                title: "PetGo Driver",
+                title: "PetGo",
                 subtitle: "Login to your account",
                 email: "Email",
                 password: "Password",
