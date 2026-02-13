@@ -67,9 +67,12 @@ export default function OnboardingScreen() {
 
 
             <View className="items-center px-6">
-                <View className="w-64 h-64 bg-white/50 rounded-full mb-10 items-center justify-center">
-                    {/* Illustration Placeholder */}
-                    <Text className="text-4xl">🐶🐱</Text>
+                <View className="w-64 h-64 bg-white/50 rounded-full mb-10 items-center justify-center overflow-hidden">
+                    <Image
+                        source={require('../../assets/icon.png')}
+                        style={{ width: '80%', height: '80%' }}
+                        resizeMode="contain"
+                    />
                 </View>
                 <Text className="text-3xl font-bold text-center text-gray-800 mb-4">{SLIDES[slideIndex].title}</Text>
                 <Text className="text-gray-500 text-center text-lg leading-6">{SLIDES[slideIndex].subtitle}</Text>
