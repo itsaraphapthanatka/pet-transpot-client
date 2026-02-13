@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Alert, ActivityIndicator, Animated, PanRe
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, router } from 'expo-router';
 import { AppButton } from '../../../components/ui/AppButton';
-import { Phone, MessageCircle, ArrowLeft, Navigation as NavIcon, User, Wallet, CreditCard, XCircle } from 'lucide-react-native';
+import { Phone, MessageCircle, ArrowLeft, Navigation as NavIcon, User, Wallet, CreditCard, CircleX } from 'lucide-react-native';
 import { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapView from 'react-native-maps';
 import { AppMapView } from '../../../components/AppMapView';
@@ -805,7 +805,7 @@ export default function ActiveJobScreen() {
                         <View className="w-full flex-row justify-between items-center mb-6">
                             <Text className="text-xl font-bold text-gray-900">Scan to Pay (PromptPay)</Text>
                             <TouchableOpacity onPress={() => setShowQRModal(false)}>
-                                <XCircle size={28} color="#9CA3AF" />
+                                <CircleX size={28} color="#9CA3AF" />
                             </TouchableOpacity>
                         </View>
 

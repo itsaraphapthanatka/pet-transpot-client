@@ -5,8 +5,8 @@ import { useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { api } from '../services/api';
-import { View } from 'react-native';
-import { I18nextProvider } from 'react-i18next';
+import { View, Alert } from 'react-native';
+import { I18nextProvider, useTranslation } from 'react-i18next';
 import i18n from '../i18n';
 import { NotificationListener } from '../components/NotificationListener';
 
@@ -20,6 +20,7 @@ try {
 
 // Initial Route Logic
 function RootLayout() {
+    const { t } = useTranslation();
     const { isAuthenticated, role } = useAuthStore();
     const segments = useSegments();
     const router = useRouter();
@@ -56,6 +57,7 @@ function RootLayout() {
         const inAuthGroup = segments[0] === '(auth)';
 
         if (isAuthenticated && inAuthGroup) {
+            console.log("Auth Check:", { isAuthenticated, role, inAuthGroup });
             const { registerForPushNotificationsAsync } = require('../services/notificationService');
             registerForPushNotificationsAsync();
 
@@ -65,8 +67,7 @@ function RootLayout() {
                 // Not a driver, show error and logout
                 const { logout } = useAuthStore.getState();
                 logout();
-                const { t } = require('react-i18next').useTranslation();
-                require('react-native').Alert.alert(
+                Alert.alert(
                     "Access Denied",
                     "This application is for drivers only. Please use the customer app or contact support."
                 );

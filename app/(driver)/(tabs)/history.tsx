@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MapPin, Clock, CheckCircle, XCircle, Car, User } from 'lucide-react-native';
+import { MapPin, Clock, CheckCircle, CircleX, Car, User } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { orderService } from '../../../services/orderService';
 import { Order } from '../../../types/order';
@@ -150,7 +150,7 @@ export default function DriverHistoryScreen() {
                         }`}
                 >
                     <View className="flex-row items-center justify-center">
-                        <XCircle
+                        <CircleX
                             size={18}
                             color={activeTab === 'cancelled' ? '#EF4444' : '#9CA3AF'}
                         />
@@ -181,7 +181,7 @@ export default function DriverHistoryScreen() {
                                 {activeTab === 'completed' ? (
                                     <CheckCircle size={40} color="#D1D5DB" />
                                 ) : (
-                                    <XCircle size={40} color="#D1D5DB" />
+                                    <CircleX size={40} color="#D1D5DB" />
                                 )}
                             </View>
                             <Text className="text-xl font-bold text-gray-400 text-center">

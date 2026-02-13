@@ -60,7 +60,7 @@ const resources = {
 
             // Login
             login_screen: {
-                title: "PetGo",
+                title: "PetGo Driver",
                 subtitle: "Login to your account",
                 email: "Email",
                 password: "Password",
@@ -225,7 +225,7 @@ const resources = {
 
             // Login
             login_screen: {
-                title: "เข้าสู่ระบบ",
+                title: "PetGo Driver",
                 subtitle: "เข้าสู่ระบบบัญชีของคุณ",
                 email: "อีเมล",
                 password: "รหัสผ่าน",

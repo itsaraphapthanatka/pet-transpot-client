@@ -31,6 +31,7 @@ export interface OTPRequest {
 export interface OTPVerifyRequest {
     phone_number: string;
     otp: string;
+    role?: string;
 }
 
 export interface AuthResponse {

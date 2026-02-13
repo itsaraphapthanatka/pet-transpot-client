@@ -48,7 +48,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     loginWithOTP: async (phoneNumber: string, otp: string) => {
         set({ isLoading: true, error: null });
         try {
-            const response = await authService.verifyOTP(phoneNumber, otp);
+            const response = await authService.verifyOTP(phoneNumber, otp, 'driver');
+
             set({
                 isAuthenticated: true,
                 role: response.role as UserRole,
@@ -92,6 +93,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ isLoading: true, error: null });
         try {
             const user = await authService.getCurrentUser();
+
+
+
             set({
                 isAuthenticated: true,
                 role: user.role,
