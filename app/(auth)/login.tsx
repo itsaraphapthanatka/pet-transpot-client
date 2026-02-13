@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, Modal, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, Modal, TouchableWithoutFeedback, Keyboard, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -80,9 +80,11 @@ export default function LoginScreen() {
                 <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }} className="px-6">
 
                     <View className="items-center mb-10">
-                        <View className="w-20 h-20 bg-green-100 rounded-2xl items-center justify-center mb-4 transform -rotate-6">
-                            <Text className="text-4xl">🐾</Text>
-                        </View>
+                        <Image
+                            source={require('../../assets/icon.png')}
+                            style={{ width: 100, height: 100, marginBottom: 16 }}
+                            resizeMode="contain"
+                        />
                         <Text className="text-3xl font-bold text-gray-900">{t('login_screen.title')}</Text>
                         <Text className="text-gray-500 mt-2">{t('login_screen.subtitle')}</Text>
                     </View>
