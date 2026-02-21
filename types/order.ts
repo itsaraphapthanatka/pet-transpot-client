@@ -58,16 +58,19 @@ export interface Order {
     pet_details?: string | null;
     customer: UserOut;
     driver?: DriverOut | null;
-    customer_lat?: number;
     customer_lng?: number;
     payment_status?: string;
     payment_method?: string;
     stripe_payment_method_id?: string | null;
     created_at: string;
+    promo_code_id?: number | null;
+    discount_amount?: number;
     pet: PetOut;
     pets: PetOut[]; // New array
     stops: OrderStop[];
     current_stop_index?: number;
+    is_round_trip?: boolean;
+    return_time?: string;
 }
 
 export interface OrderCreate {
@@ -91,4 +94,8 @@ export interface OrderCreate {
     payment_method?: string;
     stripe_payment_method_id?: string;
     stops?: OrderStop[];
+    is_round_trip?: boolean;
+    return_time?: string;
+    promo_code?: string;
+    discount_amount?: number;
 }

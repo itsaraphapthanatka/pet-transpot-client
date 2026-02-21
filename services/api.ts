@@ -8,6 +8,8 @@ export interface PricingRequest {
     vehicle_type: string;
     pet_weight_kg: number;
     provider?: string;
+    is_round_trip?: boolean;
+    pet_count?: number;
 }
 
 export interface PricingResponse {
@@ -17,6 +19,8 @@ export interface PricingResponse {
     weight_surcharge: number;
     surge_multiplier: number;
     surge_reasons: string[];
+    multi_pet_discount?: number;
+    round_trip_fee?: number;
 }
 
 export interface PaymentCreate {
@@ -25,6 +29,15 @@ export interface PaymentCreate {
     method: string; // cash, promptpay, etc.
     status?: string;
     transaction_id?: string;
+}
+
+export interface ValidatePromoResponse {
+    valid: boolean;
+    code: string;
+    discount_type: string;
+    discount_value: number;
+    discount_amount: number;
+    new_total: number;
 }
 
 export interface PaymentResponse {
@@ -413,6 +426,20 @@ export const api = {
         }
     },
 
+    // Promotions
+    validatePromo: async (data: { code: string; order_value: number }): Promise<ValidatePromoResponse> => {
+        const response = await fetch(`${API_BASE_URL}/promos/validate`, {
+            method: 'POST',
+            headers: await getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to validate promo code');
+        }
+        return response.json();
+    },
+
     // ---------- Payments ----------
     createPayment: async (data: PaymentCreate): Promise<PaymentResponse> => {
         const headers = await getAuthHeaders();
@@ -465,6 +492,10 @@ export const api = {
     // ---------- Wallet ----------
     getWalletBalance: async (): Promise<any> => {
         const headers = await getAuthHeaders();
+        if (!(headers as any)['Authorization']) {
+            console.warn('getWalletBalance: No authentication token found.');
+            return { balance: 0 };
+        }
         const response = await fetch(`${API_BASE_URL}/wallet/balance`, { headers });
         if (!response.ok) throw new Error('Failed to fetch wallet balance');
         return response.json();
@@ -472,6 +503,10 @@ export const api = {
 
     getWalletTransactions: async (): Promise<any[]> => {
         const headers = await getAuthHeaders();
+        if (!(headers as any)['Authorization']) {
+            console.warn('getWalletTransactions: No authentication token found.');
+            return [];
+        }
         const response = await fetch(`${API_BASE_URL}/wallet/transactions`, { headers });
         if (!response.ok) throw new Error('Failed to fetch transactions');
         return response.json();

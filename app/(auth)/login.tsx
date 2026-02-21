@@ -85,7 +85,7 @@ export default function LoginScreen() {
                             style={{ width: 100, height: 100, marginBottom: 16 }}
                             resizeMode="contain"
                         />
-                        <Text className="text-3xl font-bold text-gray-900">{t('login_screen.title')}</Text>
+                        {/* <Text className="text-3xl font-bold text-gray-900">{t('login_screen.title')}</Text> */}
                         <Text className="text-gray-500 mt-2">{t('login_screen.subtitle')}</Text>
                     </View>
 

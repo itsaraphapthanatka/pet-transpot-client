@@ -10,7 +10,8 @@ import { PetGoCarIcon } from '../../../components/icons/PetGoCarIcon';
 import { useTranslation } from 'react-i18next';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppButton } from '../../../components/ui/AppButton';
-import { ArrowLeft, MapPin, Clock, CreditCard, StickyNote, ChevronRight, Wallet, Bike, Car, Truck, Phone, MessageCircle, Star, PawPrint, User } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Clock, CreditCard, StickyNote, ChevronRight, Wallet, Bike, Car, Truck, Phone, MessageCircle, Star, PawPrint, User, Tag, X } from 'lucide-react-native';
+import { Switch } from 'react-native';
 import { MOCK_RIDE_OPTIONS } from '../../../utils/mockData';
 import { useBookingStore } from '../../../store/useBookingStore';
 import { api, DriverLocation } from '../../../services/api';
@@ -62,13 +63,26 @@ export default function ConfirmBookingScreen() {
     const [hereRoutes, setHereRoutes] = useState<HereRoute[]>([]);
     const [driverLocations, setDriverLocations] = useState<DriverLocation[]>([]);
     const [weightSurcharge, setWeightSurcharge] = useState(0);
+    const [multiPetDiscount, setMultiPetDiscount] = useState(0);
     const [surgeMultiplier, setSurgeMultiplier] = useState(1);
     const [surgeReasons, setSurgeReasons] = useState<string[]>([]);
+    const [roundTripFee, setRoundTripFee] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState<'cash' | 'promptpay' | 'wallet' | 'stripe'>('cash');
     const [walletBalance, setWalletBalance] = useState(0);
     const [savedCards, setSavedCards] = useState<any[]>([]);
     const [isLoadingCards, setIsLoadingCards] = useState(false);
     const [paymentConfig, setPaymentConfig] = useState<{ cash: boolean; promptpay: boolean; wallet: boolean; stripe: boolean }>({ cash: true, promptpay: true, wallet: true, stripe: true });
+
+    // Round Trip State
+    const [isRoundTrip, setIsRoundTrip] = useState(false);
+    const [returnOption, setReturnOption] = useState<'immediate' | 'time'>('immediate');
+    const [returnTimeText, setReturnTimeText] = useState('');
+
+    // Promo Code State
+    const [promoCode, setPromoCode] = useState('');
+    const [appliedPromo, setAppliedPromo] = useState<any>(null);
+    const [promoError, setPromoError] = useState('');
+    const [isApplyingPromo, setIsApplyingPromo] = useState(false);
 
     // Booking State
     const [bookingStatus, setBookingStatus] = useState<'idle' | 'searching' | 'confirmed'>('idle');
@@ -103,6 +117,30 @@ export default function ConfirmBookingScreen() {
         };
         fetchPaymentConfig();
     }, []);
+
+    // Check for first-time user to auto-apply WELCOME50 promo
+    useEffect(() => {
+        const checkFirstTimeUser = async () => {
+            if (!user || user.role !== 'customer') return;
+            if (price <= 0 || appliedPromo) return; // Wait for price to load or if promo already applied
+
+            try {
+                // Check if user has any past orders
+                const pastOrders = await orderService.getOrders();
+                if (pastOrders.length === 0) {
+                    // First time user, try applying WELCOME50
+                    const res = await api.validatePromo({ code: 'WELCOME50', order_value: price });
+                    setAppliedPromo(res);
+                    setPromoCode('WELCOME50');
+                }
+            } catch (error) {
+                console.log('Error checking first time user for promo:', error);
+                // Ignore errors, just don't apply the promo
+            }
+        };
+
+        checkFirstTimeUser();
+    }, [user, price]); // Run when user or price is available
 
     // Effect for Hydrating Existing Order
     useEffect(() => {
@@ -354,12 +392,15 @@ export default function ConfirmBookingScreen() {
                     stops: stops.map(s => ({ lat: s.latitude, lng: s.longitude })),
                     pet_weight_kg: petWeight,
                     vehicle_type: selectedVehicle.id,
-                    provider: mapProvider
+                    provider: mapProvider,
+                    is_round_trip: isRoundTrip
                 });
                 setPrice(response.estimated_price);
                 setWeightSurcharge(response.weight_surcharge || 0);
+                setMultiPetDiscount(response.multi_pet_discount || 0);
                 setSurgeMultiplier(response.surge_multiplier || 1);
                 setSurgeReasons(response.surge_reasons || []);
+                setRoundTripFee(response.round_trip_fee || 0);
                 // Use backend distance/duration if available (fallback for Google Maps failure)
                 if (response.distance_km) setDistance(response.distance_km);
                 if (response.duration_min) setDuration(response.duration_min);
@@ -375,7 +416,16 @@ export default function ConfirmBookingScreen() {
                     else if (petWeight > 20) localWeightSurcharge = 40;
                     else if (petWeight > 10) localWeightSurcharge = 20;
 
+                    // Basic local fallback for multi-pet discount (assumes 50% for now if pet_count > 1)
+                    let localMultiPetDiscount = 0;
+                    const petCount = params.petIds ? (params.petIds as string).split(',').length : 1;
+                    if (petCount > 1 && localWeightSurcharge > 0) {
+                        localMultiPetDiscount = localWeightSurcharge * 0.50; // hardcoded fallback
+                        localWeightSurcharge = Math.max(0, localWeightSurcharge - localMultiPetDiscount);
+                    }
+
                     setWeightSurcharge(localWeightSurcharge);
+                    setMultiPetDiscount(localMultiPetDiscount);
 
                     const baseComponents = selectedVehicle.basePrice + (distance * selectedVehicle.perKmRate) + (duration * (selectedVehicle.perMinRate || 0));
                     const fallbackPrice = Math.max(selectedVehicle.minPrice || 0, Math.round(baseComponents * surgeMultiplier + localWeightSurcharge));
@@ -387,7 +437,7 @@ export default function ConfirmBookingScreen() {
         };
 
         fetchPrice();
-    }, [pickupLocation, dropoffLocation, stops, selectedVehicle, distance, mapProvider, petWeight]);
+    }, [pickupLocation, dropoffLocation, stops, selectedVehicle, distance, mapProvider, petWeight, isRoundTrip]);
 
     // Calculate Route Origin/Dest based on status
     const routeOrigin = (bookingStatus === 'confirmed' && assignedDriver)
@@ -459,6 +509,31 @@ export default function ConfirmBookingScreen() {
         return d;
     }
 
+    const handleApplyPromo = async () => {
+        if (!promoCode.trim()) {
+            setPromoError('กรุณากรอกรหัสส่วนลด');
+            return;
+        }
+
+        setIsApplyingPromo(true);
+        setPromoError('');
+
+        try {
+            const res = await api.validatePromo({ code: promoCode, order_value: price });
+            setAppliedPromo(res);
+            setPromoCode('');
+        } catch (e: any) {
+            setPromoError(e.message || 'รหัสส่วนลดไม่ถูกต้อง');
+            setAppliedPromo(null);
+        } finally {
+            setIsApplyingPromo(false);
+        }
+    };
+
+    const removePromo = () => {
+        setAppliedPromo(null);
+    }
+
     const handleBook = async () => {
         if (!pickupLocation || !dropoffLocation || !selectedVehicle) return;
         if (!user?.id) {
@@ -502,6 +577,10 @@ export default function ConfirmBookingScreen() {
                 passengers: passengers,
                 pet_ids: petIds.map(Number), // Send all pet IDs
                 pet_details: displayPetNames,
+                is_round_trip: isRoundTrip,
+                return_time: isRoundTrip ? (returnOption === 'immediate' ? 'รอรับกลับทันที' : returnTimeText) : undefined,
+                promo_code: appliedPromo?.code,
+                discount_amount: appliedPromo?.discount_amount,
                 stops: stops.map((s, i) => ({
                     address: s.address || s.name || 'Stop',
                     lat: s.latitude,
@@ -1002,6 +1081,71 @@ export default function ConfirmBookingScreen() {
                         </View>
 
 
+                        {/* Round Trip Selection */}
+                        <View className="mb-6 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                            <View className="flex-row justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 mb-2">
+                                <View className="flex-row items-center">
+                                    <View className="w-8 h-8 rounded-full bg-blue-100 items-center justify-center mr-3">
+                                        <Text className="text-xl">🔁</Text>
+                                    </View>
+                                    <View>
+                                        <Text className="font-bold text-gray-800 text-base">จองไป-กลับ (Round-Trip)</Text>
+                                        <Text className="text-xs text-gray-500 mt-0.5 w-[200px]">คนขับจะรอรับกลับที่จุดหมายปลายทาง</Text>
+                                    </View>
+                                </View>
+                                <Switch
+                                    value={isRoundTrip}
+                                    onValueChange={setIsRoundTrip}
+                                    trackColor={{ false: '#D1D5DB', true: '#BFDBFE' }}
+                                    thumbColor={isRoundTrip ? '#3B82F6' : '#9CA3AF'}
+                                    style={{ transform: [{ scaleX: 1.1 }, { scaleY: 1.1 }] }}
+                                />
+                            </View>
+
+                            {isRoundTrip && (
+                                <View className="mt-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                                    <Text className="text-sm font-semibold text-gray-700 mb-3">เวลากลับ (Return Time)</Text>
+
+                                    <View className="flex-row gap-3 mb-3">
+                                        <TouchableOpacity
+                                            className={`flex-1 py-2 rounded-lg border flex-row justify-center items-center ${returnOption === 'immediate'
+                                                ? 'bg-blue-50 border-blue-500'
+                                                : 'bg-white border-gray-200'
+                                                }`}
+                                            onPress={() => setReturnOption('immediate')}
+                                        >
+                                            {returnOption === 'immediate' && <View className="w-2 h-2 rounded-full bg-blue-500 mr-2" />}
+                                            <Text className={`text-sm ${returnOption === 'immediate' ? 'text-blue-700 font-bold' : 'text-gray-600 font-medium'}`}>
+                                                รับกลับทันที (Immediate)
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            className={`flex-1 py-2 rounded-lg border flex-row justify-center items-center ${returnOption === 'time'
+                                                ? 'bg-blue-50 border-blue-500'
+                                                : 'bg-white border-gray-200'
+                                                }`}
+                                            onPress={() => setReturnOption('time')}
+                                        >
+                                            {returnOption === 'time' && <View className="w-2 h-2 rounded-full bg-blue-500 mr-2" />}
+                                            <Text className={`text-sm ${returnOption === 'time' ? 'text-blue-700 font-bold' : 'text-gray-600 font-medium'}`}>
+                                                ระบุเวลา (Specify Time)
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {returnOption === 'time' && (
+                                        <TextInput
+                                            className="w-full bg-white px-4 py-3 rounded-lg border border-gray-200 text-gray-800 mt-1"
+                                            placeholder="เช่น 14:30 หรือ รอ 2 ชั่วโมง"
+                                            value={returnTimeText}
+                                            onChangeText={setReturnTimeText}
+                                            placeholderTextColor="#9CA3AF"
+                                        />
+                                    )}
+                                </View>
+                            )}
+                        </View>
+
                         {/* Vehicle Selection */}
                         <Text className="text-lg font-bold mb-3 text-gray-900">{t('choose_vehicle')}</Text>
                         {loadingVehicles ? (
@@ -1124,6 +1268,53 @@ export default function ConfirmBookingScreen() {
                                 <View className="flex-1" />
                             </View>
                         )}
+
+                        {/* Promo Code Section */}
+                        <View className="mb-6">
+                            <Text className="text-lg font-bold mb-3 text-gray-900">Promo Code (ส่วนลด)</Text>
+                            {appliedPromo ? (
+                                <View className="bg-green-50 p-4 rounded-xl border border-green-200 flex-row justify-between items-center">
+                                    <View className="flex-row items-center">
+                                        <View className="w-8 h-8 rounded-full bg-green-100 items-center justify-center mr-3">
+                                            <Tag size={16} color="#16A34A" />
+                                        </View>
+                                        <View>
+                                            <Text className="font-bold text-green-800">{appliedPromo.code}</Text>
+                                            <Text className="text-sm text-green-600">ลด ฿{formatPrice(appliedPromo.discount_amount)}</Text>
+                                        </View>
+                                    </View>
+                                    <TouchableOpacity onPress={removePromo} className="p-2">
+                                        <X size={20} color="#16A34A" />
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <View>
+                                    <View className="flex-row gap-3">
+                                        <TextInput
+                                            value={promoCode}
+                                            onChangeText={(text) => { setPromoCode(text); setPromoError(''); }}
+                                            placeholder="กรอกรหัสส่วนลด..."
+                                            className="flex-1 bg-white px-4 py-4 rounded-xl border border-gray-200 text-gray-800 uppercase"
+                                            placeholderTextColor="#9CA3AF"
+                                            autoCapitalize="characters"
+                                        />
+                                        <TouchableOpacity
+                                            onPress={handleApplyPromo}
+                                            disabled={isApplyingPromo || !promoCode.trim()}
+                                            className={`px-6 justify-center items-center rounded-xl ${(!promoCode.trim() || isApplyingPromo) ? 'bg-gray-200' : 'bg-gray-900'}`}
+                                        >
+                                            {isApplyingPromo ? (
+                                                <ActivityIndicator color="gray" size="small" />
+                                            ) : (
+                                                <Text className={`font-bold ${!promoCode.trim() ? 'text-gray-400' : 'text-white'}`}>ใช้โค้ด</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                    {promoError ? <Text className="text-red-500 text-sm mt-2 ml-1">{promoError}</Text> : null}
+                                </View>
+                            )}
+                        </View>
+
                         <TextInput
                             placeholder="Note to driver (optional)"
                             value={note}
@@ -1167,6 +1358,24 @@ export default function ConfirmBookingScreen() {
                             </Text>
                         </View>
 
+                        {multiPetDiscount > 0 && (
+                            <View className="flex-row justify-between mb-2">
+                                <Text className="text-green-600 font-medium">✨ Multi-Pet Savings</Text>
+                                <Text className="font-semibold text-green-600">
+                                    -฿{formatPrice(multiPetDiscount)}
+                                </Text>
+                            </View>
+                        )}
+
+                        {roundTripFee > 0 && (
+                            <View className="flex-row justify-between mb-2">
+                                <Text className="text-gray-500">Round Trip / Waiting Fee</Text>
+                                <Text className="font-semibold text-gray-800">
+                                    +฿{formatPrice(roundTripFee)}
+                                </Text>
+                            </View>
+                        )}
+
                         <View className="flex-row justify-between mb-2">
                             <Text className="text-gray-500">{t('payment_method')}</Text>
                             <Text className="font-semibold text-gray-800">
@@ -1174,12 +1383,21 @@ export default function ConfirmBookingScreen() {
                             </Text>
                         </View>
 
-                        <View className="flex-row justify-between mb-6">
+                        {appliedPromo && (
+                            <View className="flex-row justify-between mb-2 mt-2 pt-2 border-t border-gray-100">
+                                <Text className="text-green-600 font-medium">ส่วนลด (Promo: {appliedPromo.code})</Text>
+                                <Text className="font-semibold text-green-600">
+                                    -฿{formatPrice(appliedPromo.discount_amount)}
+                                </Text>
+                            </View>
+                        )}
+
+                        <View className="flex-row justify-between mb-6 mt-2 pt-2 border-t border-gray-100">
                             <Text className="text-lg font-bold text-gray-900">Total</Text>
                             {loadingPrice ? (
                                 <Text className="text-2xl font-bold text-primary">Loading...</Text>
                             ) : (
-                                <Text className="text-2xl font-bold text-primary">฿{formatPrice(price)}</Text>
+                                <Text className="text-2xl font-bold text-primary">฿{formatPrice(appliedPromo ? price - appliedPromo.discount_amount : price)}</Text>
                             )}
                         </View>
                         <AppButton

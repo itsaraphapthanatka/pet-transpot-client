@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, Clock, CreditCard, CheckCircle2 } from 'lucide-react-native';
+import { Wallet, Plus, ArrowUpRight, ArrowDownLeft, CreditCard } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { api } from '../../../services/api';
+import { formatPrice } from '../../../utils/format';
+
 let useStripe: any;
 try {
     useStripe = require('@stripe/stripe-react-native').useStripe;
@@ -13,10 +17,6 @@ try {
         presentPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
     });
 }
-import { api } from '../../../services/api';
-import { formatPrice } from '../../../utils/format';
-import { AppButton } from '../../../components/ui/AppButton';
-import { Image } from 'react-native';
 
 interface Transaction {
     id: number;
@@ -27,6 +27,7 @@ interface Transaction {
 }
 
 export default function WalletScreen() {
+    const { isAuthenticated, isLoading: authLoading } = useAuthStore();
     const { t } = useTranslation();
     const [balance, setBalance] = useState(0);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -53,8 +54,12 @@ export default function WalletScreen() {
     };
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        if (isAuthenticated && !authLoading) {
+            fetchData();
+        } else if (!authLoading && !isAuthenticated) {
+            setLoading(false);
+        }
+    }, [isAuthenticated, authLoading]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -76,10 +81,8 @@ export default function WalletScreen() {
             setIsTopUpVisible(false);
             setLoading(true);
 
-            // 1. Create top-up intent on backend
             const { paymentIntent, ephemeralKey, customer, transaction_id } = await api.topupWallet(numAmount, topUpMethod);
 
-            // 2. Initialize Payment Sheet
             const { error: initError } = await initPaymentSheet({
                 paymentIntentClientSecret: paymentIntent,
                 customerEphemeralKeySecret: ephemeralKey,
@@ -99,7 +102,6 @@ export default function WalletScreen() {
                 return;
             }
 
-            // 3. Present Payment Sheet
             const { error: presentError } = await presentPaymentSheet();
 
             if (presentError) {
@@ -107,7 +109,6 @@ export default function WalletScreen() {
                     Alert.alert('Error', presentError.message);
                 }
             } else {
-                // 4. Verify with backend
                 try {
                     await api.verifyTopup(transaction_id);
                     Alert.alert("สำเร็จ", `เติมเงินจำนวน ฿${formatPrice(numAmount)} เรียบร้อยแล้ว!`);
@@ -115,7 +116,6 @@ export default function WalletScreen() {
                 } catch (err) {
                     console.error("Top-up verification failed:", err);
                     Alert.alert("กำลังตรวจสอบ", "ระบบกำลังตรวจสอบยอดเงินของคุณ กรุณารอสักครู่");
-                    // Data will refresh on next fetch/timer or manual refresh
                 }
             }
         } catch (error: any) {
@@ -143,7 +143,6 @@ export default function WalletScreen() {
                 className="flex-1 px-6"
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#00A862"]} />}
             >
-                {/* Balance Card */}
                 <View className="bg-primary rounded-3xl p-6 mb-8 shadow-lg shadow-primary/20">
                     <View className="flex-row justify-between items-start mb-4">
                         <View>
@@ -164,7 +163,6 @@ export default function WalletScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Quick Actions */}
                 <View className="flex-row gap-4 mb-8">
                     <TouchableOpacity
                         onPress={() => router.push('/(customer)/payment-methods')}
@@ -175,15 +173,8 @@ export default function WalletScreen() {
                         </View>
                         <Text className="text-gray-900 font-bold text-xs">ผูกบัตร</Text>
                     </TouchableOpacity>
-                    {/* <TouchableOpacity className="flex-1 bg-gray-50 p-4 rounded-2xl items-center">
-                        <View className="w-10 h-10 bg-orange-100 rounded-full items-center justify-center mb-2">
-                            <Clock size={20} color="#F97316" />
-                        </View>
-                        <Text className="text-gray-900 font-bold text-xs">ถอนเงิน</Text>
-                    </TouchableOpacity> */}
                 </View>
 
-                {/* Transactions History */}
                 <View className="mb-10">
                     <View className="flex-row justify-between items-center mb-4">
                         <Text className="text-xl font-bold text-gray-900">ประวัติธุรกรรม</Text>
@@ -220,7 +211,6 @@ export default function WalletScreen() {
                 </View>
             </ScrollView>
 
-            {/* Top Up Modal */}
             <Modal
                 visible={isTopUpVisible}
                 transparent={true}

@@ -30,7 +30,7 @@ export default function CustomerHome() {
 
 
 
-    const { user } = useAuthStore();
+    const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
     console.log("userdddd", user);
     const { t } = useTranslation();
     const mapRef = React.useRef<MapView>(null);
@@ -69,7 +69,7 @@ export default function CustomerHome() {
     React.useEffect(() => {
         (async () => {
             // 1. Check for Active Order
-            if (user?.id) {
+            if (isAuthenticated && !authLoading && user?.id) {
                 const activeOrder = await orderService.getActiveOrder();
                 if (activeOrder) {
                     console.log("Found active order:", activeOrder.id);
@@ -118,7 +118,7 @@ export default function CustomerHome() {
                 setPickupQuery(address);
             }
         })();
-    }, [user?.id]); // Add user?.id dependency
+    }, [user?.id, isAuthenticated, authLoading]); // Add auth dependencies
 
     // Sync local state with Booking Store (When returning from Map Picker)
     React.useEffect(() => {

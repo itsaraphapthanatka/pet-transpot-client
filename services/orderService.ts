@@ -50,6 +50,13 @@ export const orderService = {
     // Get all orders (optionally filter by status)
     getOrders: async (status?: string): Promise<Order[]> => {
         const headers = await getAuthHeaders();
+
+        // Check if authorization exists in headers
+        if (!(headers as any)['Authorization']) {
+            console.warn('getOrders: No authentication token found. Returning empty list.');
+            return [];
+        }
+
         let url = `${API_BASE_URL}/orders/`;
         if (status) {
             url += `?status=${status}`;
@@ -248,8 +255,12 @@ export const orderService = {
             const activeOrder = orders.find(o => activeStatuses.includes(o.status));
             return activeOrder || null;
         } catch (error: any) {
-            // Suppress Redbox for auth errors (401/403) to allow user to logout
-            if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
+            // Suppress Redbox for auth errors (401/403/No token) to allow user to logout or wait for load
+            if (error.message && (
+                error.message.includes('401') ||
+                error.message.includes('403') ||
+                error.message.includes('authentication token found')
+            )) {
                 console.warn('Authentication mismatch in getActiveOrder (ignoring):', error.message);
                 return null;
             }
