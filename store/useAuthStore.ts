@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { authService } from '../services/authService';
 import { User } from '../types/auth';
+import { useBookingStore } from './useBookingStore';
+import { useJobStore } from './useJobStore';
 
 type UserRole = 'customer' | 'driver' | 'admin' | null;
 
@@ -111,6 +113,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     logout: async () => {
         await authService.logout();
+
+        // Clear other stores
+        useBookingStore.getState().clearBooking();
+        useJobStore.getState().clearJobs();
+
         set({
             isAuthenticated: false,
             role: null,
