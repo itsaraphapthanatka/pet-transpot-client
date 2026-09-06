@@ -45,3 +45,4 @@ google-services.json
 # Claude Code
 .claude/settings.local.json
 .claude/agent-memory/
+google-services.base64
