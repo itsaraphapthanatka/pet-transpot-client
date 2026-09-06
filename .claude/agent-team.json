@@ -1,0 +1,75 @@
+{
+  "project": "PetGo",
+  "project_root": ".",
+  "docs_dir": "../../docs",
+  "report_language": "Thai",
+  "context_file": "PETGO-CONTEXT.md",
+  "profile": "max",
+  "roles": [
+    "product-manager",
+    "architect",
+    "ux-designer",
+    "ui-designer",
+    "backend-dev",
+    "mobile-dev",
+    "web-dev",
+    "test-engineer",
+    "api-tester",
+    "e2e-tester",
+    "mobile-tester",
+    "web-tester",
+    "code-reviewer",
+    "bug-triager",
+    "security-engineer",
+    "devops-engineer",
+    "tech-writer"
+  ],
+  "repos": [
+    {
+      "name": "Backend API",
+      "path": "../../pet_transport_fastapi_bakend",
+      "stack": "FastAPI 0.123, SQLAlchemy 2.0, Postgres, Redis, alembic (broken); venv Python 3.9 / Docker 3.12",
+      "checks": [
+        "venv/bin/python -c 'import app.main'",
+        "venv/bin/pytest -q tests/"
+      ]
+    },
+    {
+      "name": "Customer app",
+      "path": ".",
+      "stack": "Expo SDK 54, RN 0.81, expo-router, NativeWind, Zustand",
+      "checks": [
+        "npx tsc --noEmit -p tsconfig.json"
+      ]
+    },
+    {
+      "name": "Driver app",
+      "path": "../petgo-driver",
+      "stack": "same as customer app (shared by copy)",
+      "checks": [
+        "npx tsc --noEmit -p tsconfig.json"
+      ]
+    },
+    {
+      "name": "Admin panel",
+      "path": "../../pet_transport_admin",
+      "stack": "Next.js 16.1, React 19, standalone output",
+      "checks": [
+        "npm run lint",
+        "npx tsc --noEmit",
+        "npm run build"
+      ]
+    },
+    {
+      "name": "Landing page",
+      "path": "../../happy-hound-rides",
+      "stack": "Vite + React + shadcn/ui",
+      "checks": [
+        "npm run lint",
+        "npx tsc -p tsconfig.app.json --noEmit",
+        "npm run build"
+      ]
+    }
+  ],
+  "notes": "Agents in .claude/agents were hand-tuned on 2026-09-06 with embedded PetGo specifics; the context file is docs/PETGO-CONTEXT.md (not PROJECT-CONTEXT.md). Use `render.py --only <role> --force` only when you intend to reset a role to the generic template."
+}
