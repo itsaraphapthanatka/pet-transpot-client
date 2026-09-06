@@ -401,7 +401,7 @@ export default function CustomerHome() {
                     <Marker
                         key={`driver-${driver.id}`}
                         coordinate={{ latitude: driver.lat, longitude: driver.lng }}
-                        title={driver.driver?.user?.full_name || "Driver"}
+                        title={driver.driver?.full_name || t('driver')}
                         anchor={{ x: 0.5, y: 0.5 }}
                     >
                         <PetGoCarIcon width={24} height={48} />

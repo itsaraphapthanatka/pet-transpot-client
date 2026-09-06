@@ -51,7 +51,7 @@ export default function ChatScreen() {
 
         // Mark as read
         if (userId) {
-            api.markChatRead(Number(orderId), userId);
+            api.markChatRead(Number(orderId));
         }
 
         // Connect Socket as customer

@@ -61,7 +61,8 @@ export const authService = {
             formData.append('username', username);
             formData.append('password', password);
 
-            const response = await fetch(`${API_BASE_URL}/auth/driver/login`, {
+            // Customer app: POST /auth/login (users + admins). /auth/driver/login only checks the drivers table.
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -75,6 +76,12 @@ export const authService = {
             }
 
             const data: AuthResponse = await response.json();
+
+            // /auth/login also authenticates admins (response has `admin`, `user` is null). The customer app
+            // has no screens for that role, so refuse instead of storing a token with an undefined user.
+            if (!data.user) {
+                throw new Error('This account cannot sign in to the customer app');
+            }
 
             // Store token
             await tokenManager.setToken(data.access_token);

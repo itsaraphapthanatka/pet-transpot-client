@@ -946,7 +946,7 @@ export default function ConfirmBookingScreen() {
                             <Marker
                                 key={`driver-${driver.id}`}
                                 coordinate={{ latitude: driver.lat, longitude: driver.lng }}
-                                title={driver.driver?.user?.full_name || "Driver"}
+                                title={driver.driver?.full_name || t('driver')}
                                 description={`Plate: ${driver.driver?.vehicle_plate || '-'}`}
                                 anchor={{ x: 0.5, y: 0.5 }}
                             >
@@ -1439,7 +1439,7 @@ export default function ConfirmBookingScreen() {
                                 <Text className="text-2xl">👨‍✈️</Text>
                             </View>
                             <View className="flex-1">
-                                <Text className="text-xl font-bold text-gray-900">{assignedDriver.driver?.full_name || assignedDriver.driver?.user?.full_name}</Text>
+                                <Text className="text-xl font-bold text-gray-900">{assignedDriver.driver?.full_name || currentOrder?.driver?.full_name}</Text>
                                 <View className="flex-row items-center mt-1">
                                     <Star size={14} color="#F59E0B" fill="#F59E0B" />
                                     <Text className="text-sm font-semibold ml-1">4.9</Text>
@@ -1467,7 +1467,8 @@ export default function ConfirmBookingScreen() {
                             <TouchableOpacity
                                 className="flex-1 bg-green-500 py-3 rounded-xl flex-row justify-center items-center"
                                 onPress={async () => {
-                                    const driverPhone = assignedDriver?.driver?.phone || assignedDriver?.driver?.user?.phone;
+                                    // The location feed is PII-free (DriverPublicOut); the phone comes from the order's driver.
+                                    const driverPhone = currentOrder?.driver?.phone;
                                     if (driverPhone) {
                                         const url = `tel:${driverPhone}`;
                                         try {
