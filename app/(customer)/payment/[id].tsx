@@ -14,7 +14,7 @@ try {
     });
 }
 import { orderService } from '../../../services/orderService';
-import { api, PaymentResponse } from '../../../services/api';
+import { api } from '../../../services/api';
 import { Order } from '../../../types/order';
 import { AppButton } from '../../../components/ui/AppButton';
 import { formatPrice } from '../../../utils/format';
@@ -23,7 +23,6 @@ function CustomerPaymentScreen() {
     const { id } = useLocalSearchParams();
     const { t } = useTranslation();
     const [order, setOrder] = useState<Order | null>(null);
-    const [payment, setPayment] = useState<PaymentResponse | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [hasAttemptedAutoPay, setHasAttemptedAutoPay] = useState(false);
@@ -34,13 +33,6 @@ function CustomerPaymentScreen() {
         try {
             const fetchedOrder = await orderService.getOrder(Number(id));
             setOrder(fetchedOrder);
-
-            try {
-                const fetchedPayment = await api.getPaymentByOrderId(Number(id));
-                setPayment(fetchedPayment);
-            } catch (e) {
-                console.warn("No payment record found");
-            }
             return fetchedOrder;
         } catch (error) {
             console.error("Failed to fetch order for payment:", error);
@@ -89,7 +81,7 @@ function CustomerPaymentScreen() {
             // 1. Fetch PaymentIntent and customer data from backend
             const { paymentIntent, ephemeralKey, customer, publishableKey } = await api.createPaymentIntent({
                 order_id: order.id,
-                amount: order.price || 0,
+                amount: Number(order.price ?? 0), // Decimal string; the server charges order.price anyway
                 method: 'stripe'
             });
 
@@ -127,19 +119,16 @@ function CustomerPaymentScreen() {
                 }
                 setIsProcessing(false);
             } else {
-                // 4. Success! Verify with backend
-                try {
-                    // Update our internal payment record if it exists
-                    const currentPayment = payment || await api.getPaymentByOrderId(Number(id)).catch(() => null);
-                    if (currentPayment) {
-                        await api.verifyPayment(currentPayment.id, 'successful');
-                    }
-                    Alert.alert('สำเร็จ', 'ชำระเงินเรียบร้อยแล้ว!');
-                    fetchData();
-                } catch (err) {
-                    console.error("Verification error:", err);
-                    // Still might be successful in Stripe, but backend update failed
-                    fetchData();
+                // 4. The sheet succeeded on the device. Only the server marks the order paid, and only after it has
+                // retrieved the PaymentIntent from Stripe (POST /payments/sync/{order_id}); the old
+                // POST /payments/{id}/verify?status=successful took the client's word for it.
+                const synced = await api.syncPayment(order.id);
+                const updatedOrder = await fetchData();
+                if (synced?.status === 'paid' || updatedOrder?.payment_status === 'paid') {
+                    Alert.alert(t('payment_success_title'), t('payment_success_message'));
+                } else {
+                    // Stripe has not confirmed yet (processing / requires_action, or sync failed): stay on the pending UI
+                    Alert.alert(t('payment_pending_title'), t('payment_pending_message'));
                 }
             }
         } catch (error: any) {
@@ -191,7 +180,7 @@ function CustomerPaymentScreen() {
                 try {
                     const result = await api.createPaymentIntent({
                         order_id: order.id,
-                        amount: order.price || 0,
+                        amount: Number(order.price ?? 0), // Decimal string; the server charges order.price anyway
                         method: 'promptpay'
                     });
                     if (result.qr_code_url) {
@@ -360,8 +349,9 @@ function CustomerPaymentScreen() {
                             </View>
                         )}
 
+                        {/* Sync with Stripe first (POST /payments/sync/{order_id}), then reload the order */}
                         <TouchableOpacity
-                            onPress={fetchData}
+                            onPress={handleCheckStatus}
                             className="flex-row items-center py-2"
                         >
                             <RefreshCw size={16} color="#4B5563" className="mr-2" />

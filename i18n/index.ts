@@ -173,7 +173,14 @@ const resources = {
             price_changed_title: "Price updated",
             price_changed_message: "The fare for this trip is now ฿{{newPrice}} (you were quoted ฿{{oldPrice}}). Book at the new price?",
             price_changed_confirm: "Book at ฿{{newPrice}}",
-            price_changed_refresh_failed: "The price has changed and a new estimate could not be loaded ({{detail}}). Please try again."
+            price_changed_refresh_failed: "The price has changed and a new estimate could not be loaded ({{detail}}). Please try again.",
+            no_vehicle_types_available: "No vehicle type is available right now, so this trip cannot be priced. Please try again later.",
+
+            // Payment screen: only the server (after checking Stripe) may say a payment succeeded
+            payment_success_title: "Payment successful",
+            payment_success_message: "Your payment has been confirmed.",
+            payment_pending_title: "Awaiting confirmation",
+            payment_pending_message: "Stripe has not confirmed this payment yet. Tap \"Refresh status\" in a moment - do not pay again."
         }
     },
     th: {
@@ -346,7 +353,14 @@ const resources = {
             price_changed_title: "ราคามีการปรับ",
             price_changed_message: "ค่าโดยสารของทริปนี้ปรับเป็น ฿{{newPrice}} (จากเดิม ฿{{oldPrice}}) ยืนยันจองในราคาใหม่หรือไม่?",
             price_changed_confirm: "จองในราคา ฿{{newPrice}}",
-            price_changed_refresh_failed: "ราคามีการเปลี่ยนแปลง และไม่สามารถโหลดราคาใหม่ได้ ({{detail}}) กรุณาลองใหม่อีกครั้ง"
+            price_changed_refresh_failed: "ราคามีการเปลี่ยนแปลง และไม่สามารถโหลดราคาใหม่ได้ ({{detail}}) กรุณาลองใหม่อีกครั้ง",
+            no_vehicle_types_available: "ขณะนี้ไม่มีประเภทรถที่เปิดให้บริการ จึงยังคำนวณราคาทริปนี้ไม่ได้ กรุณาลองใหม่ภายหลัง",
+
+            // Payment screen: only the server (after checking Stripe) may say a payment succeeded
+            payment_success_title: "ชำระเงินสำเร็จ",
+            payment_success_message: "ระบบยืนยันยอดชำระเงินของคุณเรียบร้อยแล้ว",
+            payment_pending_title: "รอการยืนยัน",
+            payment_pending_message: "Stripe ยังไม่ยืนยันยอดชำระนี้ กรุณากด \"รีเฟรชสถานะ\" อีกครั้งในอีกสักครู่ และอย่าชำระซ้ำ"
         }
     }
 };

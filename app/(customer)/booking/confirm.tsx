@@ -26,20 +26,41 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { Order } from '../../../types/order';
 import * as Location from 'expo-location';
 import { formatPrice } from '../../../utils/format';
-import { isApiError, errorDetail } from '../../../utils/apiError';
+import { ApiError, isApiError, errorDetail } from '../../../utils/apiError';
 
 // Extend MOCK_RIDE_OPTIONS to match VEHICLE_TYPES expectation (surcharge)
 // Extend MOCK_RIDE_OPTIONS to match VEHICLE_TYPES expectation (surcharge)
 // Initial state will be empty, fetched from API
 const INITIAL_VEHICLES: any[] = [];
 
+// Structured 409 detail from POST /orders/ (backend since 2026-09-07): the server's own fare for this trip,
+// `{code: 'price_changed', message, fare, vehicle_type, quoted}`. Returns null for the legacy string detail, another
+// code, or a missing/invalid fare (the server sends null when it could not tell the vehicle type) - callers
+// then fall back to re-estimating. `fare` is accepted as a number or a numeric string (Decimal serialisation).
+function priceChangedFare(error: ApiError): { fare: number; vehicleType: string | null } | null {
+    const detail = error.detailObject;
+    if (!detail || detail.code !== 'price_changed') return null;
+    const fare = typeof detail.fare === 'number' ? detail.fare
+        : typeof detail.fare === 'string' && detail.fare.trim() ? Number(detail.fare)
+        : NaN;
+    if (!Number.isFinite(fare) || fare <= 0) return null;
+    const vehicleType = typeof detail.vehicle_type === 'string' && detail.vehicle_type.trim() ? detail.vehicle_type.trim() : null;
+    return { fare, vehicleType };
+}
+
 export default function ConfirmBookingScreen() {
     const { t } = useTranslation();
     const params = useLocalSearchParams();
     const insets = useSafeAreaInsets();
     const petWeight = params.petWeight ? Number(params.petWeight) : 0;
-    // Pets on the trip: the estimate needs the count for the multi-pet discount the server also applies at booking
-    const petCount = params.petIds ? (String(params.petIds).split(',').filter(Boolean).length || 1) : 1;
+    // Pets on the trip (ids from the pet picker). The estimate sends them so the server prices from the same
+    // Pet.weight rows POST /orders/ reads: the client-summed weight drifted from the DB weight, so the booking
+    // answered 409 against a quote the app kept re-producing. The count feeds the multi-pet discount.
+    const petIds = useMemo(
+        () => String(params.petIds ?? '').split(',').map(Number).filter((id) => Number.isInteger(id) && id > 0),
+        [params.petIds]
+    );
+    const petCount = petIds.length || 1;
     // const petName = params.petName as string; // Legacy single pet
     // const petType = params.petType as string; // Legacy single pet
     const passengers = params.passengers ? Number(params.passengers) : 1;
@@ -178,7 +199,7 @@ export default function ConfirmBookingScreen() {
                     }
                 });
 
-                setPrice(order.price || 0);
+                setPrice(Number(order.price ?? 0)); // OrderOut.price is a Decimal and arrives as a JSON string
                 // We'd ideally need vehicle info too, maybe derive from order or default
                 // Setting a default so things don't crash
                 if (vehicles.length > 0) setSelectedVehicle(vehicles[0]);
@@ -274,7 +295,7 @@ export default function ConfirmBookingScreen() {
             const fetchBalance = async () => {
                 try {
                     const res = await api.getWalletBalance();
-                    setWalletBalance(res.wallet_balance || 0);
+                    setWalletBalance(Number(res.wallet_balance ?? 0)); // Numeric(10,2) arrives as a JSON string
                 } catch (error) {
                     console.log("Error fetching wallet balance", error);
                 }
@@ -337,44 +358,51 @@ export default function ConfirmBookingScreen() {
         }
     }, [driverLocations, bookingStatus, assignedDriver, currentOrder]);
 
-    // Fetch Vehicle Types
-    React.useEffect(() => {
-        const fetchVehicles = async () => {
-            try {
-                const apiVehicles = await api.getVehicleTypes();
-                // Merge with mock data to get images and descriptions
-                const mergedVehicles = apiVehicles.map(v => {
-                    const mock = MOCK_RIDE_OPTIONS.find(m => m.id === v.key);
-                    return {
-                        id: v.key,
-                        name: v.name,
-                        image: v.image_url || mock?.image || 'car', // Fallback
-                        description: mock?.description || '',
-                        basePrice: v.rates.base,
-                        perKmRate: v.rates.per_km,
-                        perMinRate: v.rates.per_min,
-                        minPrice: v.rates.min,
-                        surcharge: 0
-                    };
-                });
-                setVehicles(mergedVehicles);
-                if (mergedVehicles.length > 0) {
-                    setSelectedVehicle(mergedVehicles[0]);
-                }
-            } catch (error) {
-                console.warn("Could not fetch vehicles from backend, using mock data:", error);
-                // Fallback to mock data when backend is unavailable
-                setVehicles(MOCK_RIDE_OPTIONS);
-                if (MOCK_RIDE_OPTIONS.length > 0) {
-                    setSelectedVehicle(MOCK_RIDE_OPTIONS[0]);
-                }
-            } finally {
-                setLoadingVehicles(false);
+    // Fetch Vehicle Types. When none is active (admin disabled them all) nothing can be priced, so say so instead
+    // of leaving the book button silently disabled; the retry link under the price re-runs this.
+    const fetchVehicles = useCallback(async () => {
+        setLoadingVehicles(true);
+        try {
+            const apiVehicles = await api.getVehicleTypes();
+            // Merge with mock data to get images and descriptions
+            const mergedVehicles = apiVehicles.map(v => {
+                const mock = MOCK_RIDE_OPTIONS.find(m => m.id === v.key);
+                return {
+                    id: v.key,
+                    name: v.name,
+                    image: v.image_url || mock?.image || 'car', // Fallback
+                    description: mock?.description || '',
+                    basePrice: v.rates.base,
+                    perKmRate: v.rates.per_km,
+                    perMinRate: v.rates.per_min,
+                    minPrice: v.rates.min,
+                    surcharge: 0
+                };
+            });
+            setVehicles(mergedVehicles);
+            if (mergedVehicles.length > 0) {
+                setSelectedVehicle(mergedVehicles[0]);
+            } else {
+                // Nothing to price: fetchPrice() returns early without a selected vehicle, so the reason is set here
+                setSelectedVehicle(null);
+                setPrice(0);
+                setPriceError(t('no_vehicle_types_available'));
             }
-        };
+        } catch (error) {
+            console.warn("Could not fetch vehicles from backend, using mock data:", error);
+            // Fallback to mock data when backend is unavailable
+            setVehicles(MOCK_RIDE_OPTIONS);
+            if (MOCK_RIDE_OPTIONS.length > 0) {
+                setSelectedVehicle(MOCK_RIDE_OPTIONS[0]);
+            }
+        } finally {
+            setLoadingVehicles(false);
+        }
+    }, [t]);
 
+    React.useEffect(() => {
         fetchVehicles();
-    }, []);
+    }, [fetchVehicles]);
 
     // Fetch Price from API. The server is the only source of the price: POST /orders/ re-prices the trip with
     // the same engine and refuses a quote below its fare, so a locally computed number (which also ignored the
@@ -393,6 +421,7 @@ export default function ConfirmBookingScreen() {
                 stops: stops.map(s => ({ lat: s.latitude, lng: s.longitude })),
                 pet_weight_kg: petWeight,
                 pet_count: petCount,
+                pet_ids: petIds.length > 0 ? petIds : undefined, // omitted (not []) when no pet was picked
                 vehicle_type: selectedVehicle.id,
                 is_round_trip: isRoundTrip
             });
@@ -418,7 +447,7 @@ export default function ConfirmBookingScreen() {
         } finally {
             if (seq === priceSeqRef.current) setLoadingPrice(false);
         }
-    }, [pickupLocation, dropoffLocation, stops, selectedVehicle, petWeight, petCount, isRoundTrip]);
+    }, [pickupLocation, dropoffLocation, stops, selectedVehicle, petWeight, petCount, petIds, isRoundTrip]);
 
     // `distance` is no longer a dependency: it only fed the removed local fallback, and because the estimate
     // itself sets it, keeping it re-ran this effect (a second billed request) after every estimate.
@@ -552,16 +581,22 @@ export default function ConfirmBookingScreen() {
         setAppliedPromo(null);
     }
 
-    // Book at `quotedPrice` = the fare the customer has just seen. The server re-prices the trip and answers 409
-    // when its fare for this vehicle type is more than 10 THB higher; that path re-estimates and asks again.
-    const submitBooking = async (quotedPrice: number) => {
+    // What the customer actually pays for a fare: the promo discount comes off first (the server re-applies it).
+    const payableTotal = (fare: number) => Math.max(0, fare - Number(appliedPromo?.discount_amount ?? 0));
+
+    // Book at `quotedPrice` = the fare the customer has just seen; `vehicleType` defaults to the selected vehicle (the
+    // 409 path passes the type the server priced). The server re-prices the trip and answers 409 when its fare for
+    // this vehicle type is more than 10 THB higher; handlePriceConflict then asks the customer before re-submitting.
+    const submitBooking = async (quotedPrice: number, vehicleType?: string) => {
         if (!pickupLocation || !dropoffLocation || !selectedVehicle) return;
         if (!user?.id) {
             Alert.alert('Error', 'Please login to book a ride');
             return;
         }
         if (quotedPrice <= 0 || priceError) return; // the button is disabled in this state; guard the 409 re-submit too
-        if (paymentMethod === 'wallet' && walletBalance < quotedPrice) {
+        // Compare the wallet with the discounted total, not the raw quote: a balance that covers the price after the
+        // promo was wrongly sent to top up.
+        if (paymentMethod === 'wallet' && walletBalance < payableTotal(quotedPrice)) {
             Alert.alert(
                 'ยอดเงินคงเหลือไม่พอ',
                 `คุณมียอดเงินในวอลเล็ทไม่เพียงพอ (คงเหลือ ฿${formatPrice(walletBalance)}) กรุณาเติมเงินก่อนดำเนินการจอง`,
@@ -577,9 +612,7 @@ export default function ConfirmBookingScreen() {
 
         try {
             // Create order via API
-            const petIdsStr = params.petIds as string;
-            const petIds = petIdsStr ? petIdsStr.split(',') : [];
-            const primaryPetId = petIds.length > 0 ? Number(petIds[0]) : 1;
+            const primaryPetId = petIds.length > 0 ? petIds[0] : 1;
 
             const order = await orderService.createOrder({
                 user_id: user.id,
@@ -591,13 +624,13 @@ export default function ConfirmBookingScreen() {
                 dropoff_lat: dropoffLocation.latitude,
                 dropoff_lng: dropoffLocation.longitude,
                 price: quotedPrice, // the quote the customer saw; the server compares it with its own fare
-                vehicle_type: selectedVehicle.id, // so the server prices this type instead of guessing it from the quote
+                vehicle_type: vehicleType ?? selectedVehicle.id, // so the server prices this type instead of guessing it from the quote
                 status: 'pending',
                 payment_method: paymentMethod,
                 payment_status: paymentMethod === 'cash' ? 'pending' : 'pending', // Both pending initially
                 stripe_payment_method_id: paymentMethod === 'stripe' ? savedCards[0]?.id : undefined,
                 passengers: passengers,
-                pet_ids: petIds.map(Number), // Send all pet IDs
+                pet_ids: petIds, // every pet on the trip - the same ids the estimate priced
                 pet_details: displayPetNames,
                 is_round_trip: isRoundTrip,
                 return_time: isRoundTrip ? (returnOption === 'immediate' ? 'รอรับกลับทันที' : returnTimeText) : undefined,
@@ -758,8 +791,8 @@ export default function ConfirmBookingScreen() {
             console.error('Failed to create order:', error);
             setBookingStatus('idle');
             if (isApiError(error) && error.status === 409) {
-                // The server's fare is above the quote: refresh the price and let the customer decide
-                await handlePriceConflict(quotedPrice);
+                // The server's fare is above the quote: show its fare and let the customer decide
+                await handlePriceConflict(quotedPrice, error);
                 return;
             }
             if (isApiError(error) && error.status === 401) {
@@ -771,25 +804,41 @@ export default function ConfirmBookingScreen() {
         }
     };
 
-    // POST /orders/ answered 409 ("Price changed ..."): re-estimate, show the new fare and book only once the
-    // customer agrees to it. Nothing is ever booked at a price the customer has not seen.
-    const handlePriceConflict = async (quotedPrice: number) => {
-        let fresh: PricingResponse | null;
-        try {
-            fresh = await fetchPrice();
-        } catch (error) {
-            // priceError is set and the button disabled; say why the price could not be refreshed
-            Alert.alert(t('price_changed_title'), t('price_changed_refresh_failed', { detail: errorDetail(error) }));
-            return;
+    // POST /orders/ answered 409 (server fare above the quote). The backend now puts its fare in the detail
+    // ({code: 'price_changed', fare, vehicle_type, quoted}); offer exactly that number and book with it. Re-estimating
+    // with the app's own inputs returned the same stale quote (the weight from the pet picker differed from the
+    // Pet.weight the booking reads) and 409'd again for ever. Older backends send a plain string, and `fare` is null
+    // when the server could not tell the vehicle type: those paths still re-estimate. No background re-estimate on
+    // the structured path either - it would overwrite the server's number with the stale quote and restart the loop.
+    // Nothing is ever booked at a price the customer has not seen.
+    const handlePriceConflict = async (quotedPrice: number, error: ApiError) => {
+        let newPrice: number;
+        let vehicleType: string | undefined;
+        const serverFare = priceChangedFare(error);
+        if (serverFare) {
+            newPrice = serverFare.fare;
+            vehicleType = serverFare.vehicleType ?? undefined;
+            // Show the server's number on screen too, so declining and pressing book again sends it as the quote
+            setPrice(newPrice);
+            setPriceError(null);
+        } else {
+            let fresh: PricingResponse | null;
+            try {
+                fresh = await fetchPrice();
+            } catch (refreshError) {
+                // priceError is set and the button disabled; say why the price could not be refreshed
+                Alert.alert(t('price_changed_title'), t('price_changed_refresh_failed', { detail: errorDetail(refreshError) }));
+                return;
+            }
+            if (!fresh) return;
+            newPrice = fresh.estimated_price;
         }
-        if (!fresh) return;
-        const newPrice = fresh.estimated_price;
         Alert.alert(
             t('price_changed_title'),
             t('price_changed_message', { newPrice: formatPrice(newPrice), oldPrice: formatPrice(quotedPrice) }),
             [
                 { text: t('cancel'), style: 'cancel' },
-                { text: t('price_changed_confirm', { newPrice: formatPrice(newPrice) }), onPress: () => { submitBooking(newPrice); } },
+                { text: t('price_changed_confirm', { newPrice: formatPrice(newPrice) }), onPress: () => { submitBooking(newPrice, vehicleType); } },
             ]
         );
     };
@@ -1264,7 +1313,7 @@ export default function ConfirmBookingScreen() {
                                     </View>
                                     <View>
                                         <Text className={`font-semibold ${paymentMethod === 'wallet' ? 'text-primary' : 'text-gray-500'}`}>วอลเล็ท</Text>
-                                        <Text className={`text-[10px] ${walletBalance < price ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                                        <Text className={`text-[10px] ${walletBalance < payableTotal(price) ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
                                             ฿{formatPrice(walletBalance)}
                                         </Text>
                                     </View>
@@ -1440,7 +1489,11 @@ export default function ConfirmBookingScreen() {
                                 <Text className="text-red-700 font-medium">{t('price_unavailable')}</Text>
                                 <Text className="text-red-500 text-xs mt-1">{priceError}</Text>
                                 <TouchableOpacity
-                                    onPress={() => { fetchPrice().catch(() => { /* shown via priceError */ }); }}
+                                    onPress={() => {
+                                        // No vehicle types = nothing to price: reload them instead of re-estimating
+                                        if (vehicles.length === 0) { fetchVehicles(); return; }
+                                        fetchPrice().catch(() => { /* shown via priceError */ });
+                                    }}
                                     className="mt-2 self-start"
                                 >
                                     <Text className="text-primary font-bold">{t('retry')}</Text>

@@ -41,7 +41,7 @@ export default function WalletScreen() {
     const fetchData = async () => {
         try {
             const userData = await api.getWalletBalance();
-            setBalance(userData.wallet_balance || 0);
+            setBalance(Number(userData.wallet_balance ?? 0)); // Numeric(10,2) arrives as a JSON string
 
             const txns = await api.getWalletTransactions();
             setTransactions(txns);
