@@ -11,7 +11,6 @@ console.log('TOKEN_KEY', TOKEN_KEY);
 // Helper function to get auth headers
 async function getAuthHeaders(): Promise<HeadersInit> {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
-    console.log('getAuthHeaders: Token found', token);
     if (!token) {
         console.warn('getAuthHeaders: No token found');
     } else {

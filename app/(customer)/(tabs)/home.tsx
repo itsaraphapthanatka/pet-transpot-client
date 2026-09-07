@@ -18,20 +18,19 @@ import { orderService } from '../../../services/orderService';
 
 import { LocationSearch, SearchResult } from '../../../components/LocationSearch';
 import { longdoMapApi } from '../../../services/longdoMapApi';
-import { hereMapApi, LatLng, HereRouteSegment } from '../../../services/hereMapApi';
+import { googleDirectionsApi, LatLng, DirectionsSegment } from '../../../services/googleDirectionsApi';
+import { RouteErrorBanner } from '../../../components/RouteErrorBanner';
 import { useBookingStore } from '../../../store/useBookingStore';
 
 
 
 
-const HERE_MAPS_API_KEY = "z8S6QWJ90hW5peIMiwDk9sCdlKEPj7cYiZz0fdoAbxU";
 
 export default function CustomerHome() {
 
 
 
     const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
-    console.log("userdddd", user);
     const { t } = useTranslation();
     const mapRef = React.useRef<MapView>(null);
     const [driverLocations, setDriverLocations] = React.useState<DriverLocation[]>([]);
@@ -46,7 +45,8 @@ export default function CustomerHome() {
     } = useBookingStore();
 
     const [routeCoordinates, setRouteCoordinates] = React.useState<LatLng[]>([]);
-    const [routeSegments, setRouteSegments] = React.useState<HereRouteSegment[]>([]);
+    const [routeSegments, setRouteSegments] = React.useState<DirectionsSegment[]>([]);
+    const [routeError, setRouteError] = React.useState<unknown>(null);
 
 
 
@@ -166,39 +166,47 @@ export default function CustomerHome() {
         return () => clearTimeout(timeoutId);
     }, [pickupQuery, dropoffQuery, activeField]);
 
-    // Fetch Route when both locations are set
+    // Fetch Google Directions route when both locations are set
     React.useEffect(() => {
+        let cancelled = false;
+
         const fetchRoute = async () => {
-            if (pickupLocation && dropoffLocation) {
-                const origin: LatLng = { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude };
-                const destination: LatLng = { latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude };
-
-                // Extract coordinates from stops
-                const stopCoords: LatLng[] = stops.map(s => ({ latitude: s.latitude, longitude: s.longitude }));
-
-                // Use getHereRoute as it seems simpler for A to B, or getRoutes
-                // Force traffic mode: 'car' usually implies traffic consideration in HERE API if not disabled
-                const routes = await hereMapApi.getRoutes(origin, destination, stopCoords, 'car', HERE_MAPS_API_KEY);
-
-
-                if (routes.length > 0 && routes[0].coordinates && routes[0].coordinates.length > 0) {
-                    setRouteCoordinates(routes[0].coordinates);
-                    setRouteSegments(routes[0].segments);
-
-                    // Fit map to route
-                    if (mapRef.current) {
-                        mapRef.current.fitToCoordinates(routes[0].coordinates, {
-                            edgePadding: { top: 100, right: 50, bottom: 400, left: 50 },
-                            animated: true
-                        });
-                    }
-                }
-            } else {
+            if (!pickupLocation || !dropoffLocation) {
                 setRouteCoordinates([]);
                 setRouteSegments([]);
+                setRouteError(null);
+                return;
+            }
+
+            const origin: LatLng = { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude };
+            const destination: LatLng = { latitude: dropoffLocation.latitude, longitude: dropoffLocation.longitude };
+            const stopCoords: LatLng[] = stops.map(s => ({ latitude: s.latitude, longitude: s.longitude }));
+
+            try {
+                const routes = await googleDirectionsApi.getRoutes(origin, destination, stopCoords, 'car');
+                if (cancelled) return;
+
+                setRouteCoordinates(routes[0].coordinates);
+                setRouteSegments(routes[0].segments);
+                setRouteError(null);
+
+                // Fit map to route
+                if (mapRef.current && routes[0].coordinates.length > 0) {
+                    mapRef.current.fitToCoordinates(routes[0].coordinates, {
+                        edgePadding: { top: 100, right: 50, bottom: 400, left: 50 },
+                        animated: true
+                    });
+                }
+            } catch (error) {
+                if (cancelled) return;
+                // Surface the real reason (key denied, no route, offline) instead of an empty map
+                setRouteCoordinates([]);
+                setRouteSegments([]);
+                setRouteError(error);
             }
         };
         fetchRoute();
+        return () => { cancelled = true; };
     }, [pickupLocation, dropoffLocation, stops]);
 
 
@@ -409,6 +417,8 @@ export default function CustomerHome() {
                 ))}
 
             </AppMapView>
+
+            <RouteErrorBanner error={routeError} style={{ bottom: 110, left: 16, right: 80 }} />
 
             <SafeAreaView className="absolute top-0 w-full px-5 pt-12 flex-row justify-between items-center z-10">
                 <View className="flex-row items-center bg-white/90 p-2 pr-4 rounded-full shadow-md backdrop-blur-md">

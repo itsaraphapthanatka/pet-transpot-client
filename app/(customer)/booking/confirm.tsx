@@ -1,12 +1,12 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, TextInput, Platform, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import MapView from 'react-native-maps';
 import { AppMapView } from '../../../components/AppMapView';
-import MapViewDirections from 'react-native-maps-directions';
 import { PetGoCarIcon } from '../../../components/icons/PetGoCarIcon';
+import { RouteErrorBanner } from '../../../components/RouteErrorBanner';
 import { useTranslation } from 'react-i18next';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppButton } from '../../../components/ui/AppButton';
@@ -15,7 +15,10 @@ import { Switch } from 'react-native';
 import { MOCK_RIDE_OPTIONS } from '../../../utils/mockData';
 import { useBookingStore } from '../../../store/useBookingStore';
 import { api, DriverLocation } from '../../../services/api';
-import { hereMapApi, LatLng, HereRoute } from '../../../services/hereMapApi';
+import {
+    googleDirectionsApi, LatLng, DirectionsRoute, DirectionsSegment, RouteRequest, RouteRequestRecord, TransportMode,
+    shouldRefetchRoute, trimRouteToPoint,
+} from '../../../services/googleDirectionsApi';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { Dimensions, Animated, PanResponder, Image } from 'react-native';
 import { orderService } from '../../../services/orderService';
@@ -23,9 +26,6 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { Order } from '../../../types/order';
 import * as Location from 'expo-location';
 import { formatPrice } from '../../../utils/format';
-
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
-const HERE_MAPS_API_KEY = process.env.EXPO_PUBLIC_HERE_MAPS_API_KEY || "";
 
 // Extend MOCK_RIDE_OPTIONS to match VEHICLE_TYPES expectation (surcharge)
 // Extend MOCK_RIDE_OPTIONS to match VEHICLE_TYPES expectation (surcharge)
@@ -53,14 +53,13 @@ export default function ConfirmBookingScreen() {
     const [note, setNote] = useState('');
     const { pickupLocation, dropoffLocation, stops, clearBooking } = useBookingStore();
     const [distance, setDistance] = useState(0);
-    // Force HERE Maps on confirm page
-    const mapProvider: string = 'here';
     const [duration, setDuration] = useState(0);
     const [price, setPrice] = useState(0);
     const [loadingPrice, setLoadingPrice] = useState(false);
     const [vehicles, setVehicles] = useState<any[]>([]);
     const [loadingVehicles, setLoadingVehicles] = useState(true);
-    const [hereRoutes, setHereRoutes] = useState<HereRoute[]>([]);
+    const [directionsRoutes, setDirectionsRoutes] = useState<DirectionsRoute[]>([]);
+    const [routeError, setRouteError] = useState<unknown>(null);
     const [driverLocations, setDriverLocations] = useState<DriverLocation[]>([]);
     const [weightSurcharge, setWeightSurcharge] = useState(0);
     const [multiPetDiscount, setMultiPetDiscount] = useState(0);
@@ -392,7 +391,6 @@ export default function ConfirmBookingScreen() {
                     stops: stops.map(s => ({ lat: s.latitude, lng: s.longitude })),
                     pet_weight_kg: petWeight,
                     vehicle_type: selectedVehicle.id,
-                    provider: mapProvider,
                     is_round_trip: isRoundTrip
                 });
                 setPrice(response.estimated_price);
@@ -437,7 +435,7 @@ export default function ConfirmBookingScreen() {
         };
 
         fetchPrice();
-    }, [pickupLocation, dropoffLocation, stops, selectedVehicle, distance, mapProvider, petWeight, isRoundTrip]);
+    }, [pickupLocation, dropoffLocation, stops, selectedVehicle, distance, petWeight, isRoundTrip]);
 
     // Calculate Route Origin/Dest based on status
     const routeOrigin = (bookingStatus === 'confirmed' && assignedDriver)
@@ -450,51 +448,75 @@ export default function ConfirmBookingScreen() {
 
     const [driverDuration, setDriverDuration] = useState(0);
 
-    // Fetch HERE Routes when origin/dest changes
+    const routeRequestRef = useRef<RouteRequestRecord | null>(null);
+    const routeSeqRef = useRef(0);
+
+    // Between (throttled) refetches, start the drawn approach route at the driver's live position
+    const displayedSegments = useMemo<DirectionsSegment[]>(() => {
+        const route = directionsRoutes[0];
+        if (!route) return [];
+        if (bookingStatus === 'confirmed' && assignedDriver && route.segments.length > 0) {
+            const driverPosition = { latitude: assignedDriver.lat, longitude: assignedDriver.lng };
+            return [{ ...route.segments[0], coordinates: trimRouteToPoint(route.segments[0].coordinates, driverPosition) }];
+        }
+        return route.segments;
+    }, [directionsRoutes, bookingStatus, assignedDriver]);
+
+    // Fetch Google Directions route when origin/dest changes.
+    // The 5 s driver poll re-runs this effect; shouldRefetchRoute() only lets a (billed) request out
+    // when the target changed, or the driver moved >= 50 m and >= 30 s passed. Otherwise the drawn
+    // route stays untouched (no flicker).
     useEffect(() => {
+        if (!routeOrigin || !routeDestination) return;
+
+        // Determine mode (car/bike/truck) based on selected vehicle or default to car
+        const mode: TransportMode = selectedVehicle?.id === 'bike' ? 'scooter' :
+            selectedVehicle?.id === 'van' ? 'truck' : 'car';
+        const request: RouteRequest = {
+            origin: routeOrigin,
+            destination: routeDestination,
+            stops: bookingStatus === 'idle' ? stops.map(s => ({ latitude: s.latitude, longitude: s.longitude })) : [],
+            mode,
+        };
+        if (!shouldRefetchRoute(routeRequestRef.current, request)) return;
+
+        const seq = ++routeSeqRef.current;
+        routeRequestRef.current = { request, at: Date.now(), failed: false };
+
         const fetchRoutes = async () => {
-            if (!routeOrigin || !routeDestination || mapProvider !== 'here') return;
-
             try {
-                // Determine mode (car/bike/truck) based on selected vehicle or default to car
-                // For driver approach, we might want to use the driver's actual mode, assuming selectedVehicle.id maps correctly
-                const mode = selectedVehicle?.id === 'bike' ? 'scooter' :
-                    selectedVehicle?.id === 'van' ? 'truck' : 'car';
+                const routes = await googleDirectionsApi.getRoutes(request.origin, request.destination, request.stops, request.mode);
+                if (seq !== routeSeqRef.current) return; // superseded by a newer request
 
-                const routes = await hereMapApi.getRoutes(
-                    routeOrigin,
-                    routeDestination,
-                    bookingStatus === 'idle' ? stops.map(s => ({ latitude: s.latitude, longitude: s.longitude })) : [],
-                    mode as any,
-                    HERE_MAPS_API_KEY
-                );
+                setDirectionsRoutes(routes);
+                setRouteError(null);
 
-                if (routes.length > 0) {
-                    setHereRoutes(routes);
+                if (bookingStatus === 'idle') {
+                    setDistance(routes[0].distance / 1000);
+                    setDuration(routes[0].duration / 60);
+                } else if (bookingStatus === 'confirmed') {
+                    // When confirmed, this route is Driver -> Pickup
+                    setDriverDuration(routes[0].duration / 60);
+                }
 
-                    if (bookingStatus === 'idle') {
-                        setDistance(routes[0].distance / 1000);
-                        setDuration(routes[0].duration / 60);
-                    } else if (bookingStatus === 'confirmed') {
-                        // When confirmed, this route is Driver -> Pickup
-                        setDriverDuration(routes[0].duration / 60);
-                    }
-
-                    const isFollowing = currentOrder?.status === 'in_progress' || currentOrder?.status === 'picked_up';
-                    if (mapRef.current && !isFollowing) {
-                        mapRef.current.fitToCoordinates(routes[0].coordinates, {
-                            edgePadding: { top: 50, right: 50, bottom: 350, left: 50 },
-                            animated: true,
-                        });
-                    }
+                const isFollowing = currentOrder?.status === 'in_progress' || currentOrder?.status === 'picked_up';
+                if (mapRef.current && !isFollowing) {
+                    mapRef.current.fitToCoordinates(routes[0].coordinates, {
+                        edgePadding: { top: 50, right: 50, bottom: 350, left: 50 },
+                        animated: true,
+                    });
                 }
             } catch (error) {
-                console.log("Error fetching HERE routes:", error);
+                if (seq !== routeSeqRef.current) return;
+                // Surface the real reason (key denied, no route, offline) instead of an empty map
+                routeRequestRef.current = { request, at: Date.now(), failed: true };
+                setDirectionsRoutes([]);
+                setRouteError(error);
             }
         };
 
         fetchRoutes();
-    }, [bookingStatus, assignedDriver, pickupLocation, dropoffLocation, mapProvider, selectedVehicle, currentOrder?.status]);
+    }, [bookingStatus, assignedDriver, pickupLocation, dropoffLocation, stops, selectedVehicle, currentOrder?.status]);
 
     const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
         const R = 6371; // Radius of the earth in km
@@ -861,55 +883,27 @@ export default function ConfirmBookingScreen() {
                             ))}
                             {(routeOrigin && routeDestination) && (
                                 <>
-                                    {mapProvider === 'google' ? (
-                                        <MapViewDirections
-                                            origin={routeOrigin}
-                                            destination={routeDestination}
-                                            apikey={GOOGLE_MAPS_API_KEY}
-                                            strokeWidth={4}
-                                            strokeColor={bookingStatus === 'confirmed' ? "#00A862" : "#3B82F6"} // Green for driver, Blue for trip
-                                            onReady={result => {
-                                                if (bookingStatus === 'idle') {
-                                                    setDistance(result.distance);
-                                                    setDuration(result.duration);
-                                                }
-                                                // Handle fitting map
-                                                if (mapRef.current) {
-                                                    mapRef.current.fitToCoordinates(result.coordinates, {
-                                                        edgePadding: { top: 100, right: 50, bottom: 400, left: 50 },
-                                                        animated: true
-                                                    });
-                                                }
-                                            }}
-                                            onError={(errorMessage) => {
-                                                console.log('GOT AN ERROR', errorMessage);
-                                            }}
-                                        />
+                                    {displayedSegments.length > 0 ? (
+                                        displayedSegments.map((segment, index) => (
+                                            <Polyline
+                                                key={`route-segment-${index}`}
+                                                coordinates={segment.coordinates}
+                                                strokeColor={segment.color}
+                                                strokeWidth={10}
+                                                lineCap="round"
+                                                lineJoin="round"
+                                                zIndex={10}
+                                            />
+                                        ))
                                     ) : (
-                                        <>
-                                            {hereRoutes.length > 0 && hereRoutes[0].segments && hereRoutes[0].segments.length > 0 ? (
-                                                hereRoutes[0].segments.map((segment, index) => (
-                                                    <Polyline
-                                                        key={`traffic-segment-${index}`}
-                                                        coordinates={segment.coordinates}
-                                                        strokeColor={segment.color}
-                                                        strokeWidth={10}
-                                                        lineCap="round"
-                                                        lineJoin="round"
-                                                        zIndex={10}
-                                                    />
-                                                ))
-                                            ) : (
-                                                hereRoutes.length > 0 && (
-                                                    <Polyline
-                                                        coordinates={hereRoutes[0].coordinates}
-                                                        strokeColor="#3B82F6"
-                                                        strokeWidth={5}
-                                                        zIndex={10}
-                                                    />
-                                                )
-                                            )}
-                                        </>
+                                        directionsRoutes.length > 0 && (
+                                            <Polyline
+                                                coordinates={directionsRoutes[0].coordinates}
+                                                strokeColor="#3B82F6"
+                                                strokeWidth={5}
+                                                zIndex={10}
+                                            />
+                                        )
                                     )}
                                 </>
                             )}
@@ -954,6 +948,8 @@ export default function ConfirmBookingScreen() {
                             </Marker>
                         ))}
                 </AppMapView>
+
+                <RouteErrorBanner error={routeError} />
 
                 {/* Back Button Overlay */}
                 <TouchableOpacity
