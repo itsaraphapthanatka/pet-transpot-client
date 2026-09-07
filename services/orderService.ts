@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Order, OrderCreate } from '../types/order';
+import { apiErrorFromResponse } from '../utils/apiError';
 
 const API_BASE_URL = Platform.OS === 'android' ? process.env.EXPO_PUBLIC_API_BASE_URL : process.env.EXPO_PUBLIC_API_BASE_URL;
 const TOKEN_KEY = '@pet_transport_token';
@@ -39,8 +40,9 @@ export const orderService = {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to create order: ${response.status} - ${errorText}`);
+            // ApiError exposes status + FastAPI `detail`: 409 = server fare above the quote ("Price changed"),
+            // 400 = unknown vehicle_type / promo problem. The screen re-estimates on 409 and asks the customer.
+            throw await apiErrorFromResponse(response, 'Failed to create order');
         }
 
         return await response.json();

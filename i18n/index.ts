@@ -164,7 +164,16 @@ const resources = {
             route_error_config: "Google Maps API key is not configured in this app",
             route_error_quota: "Route lookup quota exceeded. Please try again later.",
             route_error_network: "No internet connection. Could not load the route.",
-            route_error_generic: "Could not load the route ({{detail}})"
+            route_error_generic: "Could not load the route ({{detail}})",
+
+            // Booking confirm: server-side pricing (POST /orders/ re-prices and may answer 409)
+            booking_failed_title: "Booking Failed",
+            booking_failed_generic: "Unable to create booking. Please try again.",
+            price_unavailable: "Could not get a price from the server. Booking is disabled until a price is available.",
+            price_changed_title: "Price updated",
+            price_changed_message: "The fare for this trip is now ฿{{newPrice}} (you were quoted ฿{{oldPrice}}). Book at the new price?",
+            price_changed_confirm: "Book at ฿{{newPrice}}",
+            price_changed_refresh_failed: "The price has changed and a new estimate could not be loaded ({{detail}}). Please try again."
         }
     },
     th: {
@@ -328,7 +337,16 @@ const resources = {
             route_error_config: "แอปยังไม่ได้ตั้งค่า Google Maps API key",
             route_error_quota: "โควตาการค้นหาเส้นทางเต็มแล้ว กรุณาลองใหม่ภายหลัง",
             route_error_network: "ไม่มีการเชื่อมต่ออินเทอร์เน็ต ไม่สามารถโหลดเส้นทางได้",
-            route_error_generic: "โหลดเส้นทางไม่สำเร็จ ({{detail}})"
+            route_error_generic: "โหลดเส้นทางไม่สำเร็จ ({{detail}})",
+
+            // Booking confirm: server-side pricing (POST /orders/ re-prices and may answer 409)
+            booking_failed_title: "จองไม่สำเร็จ",
+            booking_failed_generic: "ไม่สามารถสร้างการจองได้ กรุณาลองใหม่อีกครั้ง",
+            price_unavailable: "ไม่สามารถคำนวณราคาจากเซิร์ฟเวอร์ได้ จะจองได้เมื่อมีราคาแล้ว",
+            price_changed_title: "ราคามีการปรับ",
+            price_changed_message: "ค่าโดยสารของทริปนี้ปรับเป็น ฿{{newPrice}} (จากเดิม ฿{{oldPrice}}) ยืนยันจองในราคาใหม่หรือไม่?",
+            price_changed_confirm: "จองในราคา ฿{{newPrice}}",
+            price_changed_refresh_failed: "ราคามีการเปลี่ยนแปลง และไม่สามารถโหลดราคาใหม่ได้ ({{detail}}) กรุณาลองใหม่อีกครั้ง"
         }
     }
 };

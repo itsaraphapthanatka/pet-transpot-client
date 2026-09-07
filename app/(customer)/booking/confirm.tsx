@@ -14,10 +14,10 @@ import { ArrowLeft, MapPin, Clock, CreditCard, StickyNote, ChevronRight, Wallet,
 import { Switch } from 'react-native';
 import { MOCK_RIDE_OPTIONS } from '../../../utils/mockData';
 import { useBookingStore } from '../../../store/useBookingStore';
-import { api, DriverLocation } from '../../../services/api';
+import { api, DriverLocation, PricingResponse } from '../../../services/api';
 import {
     googleDirectionsApi, LatLng, DirectionsRoute, DirectionsSegment, RouteRequest, RouteRequestRecord, TransportMode,
-    shouldRefetchRoute, trimRouteToPoint,
+    isRoutingError, shouldRefetchRoute, trimRouteToPoint,
 } from '../../../services/googleDirectionsApi';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { Dimensions, Animated, PanResponder, Image } from 'react-native';
@@ -26,6 +26,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { Order } from '../../../types/order';
 import * as Location from 'expo-location';
 import { formatPrice } from '../../../utils/format';
+import { isApiError, errorDetail } from '../../../utils/apiError';
 
 // Extend MOCK_RIDE_OPTIONS to match VEHICLE_TYPES expectation (surcharge)
 // Extend MOCK_RIDE_OPTIONS to match VEHICLE_TYPES expectation (surcharge)
@@ -37,6 +38,8 @@ export default function ConfirmBookingScreen() {
     const params = useLocalSearchParams();
     const insets = useSafeAreaInsets();
     const petWeight = params.petWeight ? Number(params.petWeight) : 0;
+    // Pets on the trip: the estimate needs the count for the multi-pet discount the server also applies at booking
+    const petCount = params.petIds ? (String(params.petIds).split(',').filter(Boolean).length || 1) : 1;
     // const petName = params.petName as string; // Legacy single pet
     // const petType = params.petType as string; // Legacy single pet
     const passengers = params.passengers ? Number(params.passengers) : 1;
@@ -56,6 +59,9 @@ export default function ConfirmBookingScreen() {
     const [duration, setDuration] = useState(0);
     const [price, setPrice] = useState(0);
     const [loadingPrice, setLoadingPrice] = useState(false);
+    // Why the server could not price the trip; while set, booking is disabled (there is no local fallback price)
+    const [priceError, setPriceError] = useState<string | null>(null);
+    const priceSeqRef = useRef(0);
     const [vehicles, setVehicles] = useState<any[]>([]);
     const [loadingVehicles, setLoadingVehicles] = useState(true);
     const [directionsRoutes, setDirectionsRoutes] = useState<DirectionsRoute[]>([]);
@@ -370,76 +376,63 @@ export default function ConfirmBookingScreen() {
         fetchVehicles();
     }, []);
 
-    // Fetch Price from API
-    React.useEffect(() => {
-        const fetchPrice = async () => {
-            if (!pickupLocation || !dropoffLocation || !selectedVehicle) return;
-            // console.log("Fetching price for:", {
-            //     pickupLocation,
-            //     dropoffLocation,
-            //     selectedVehicle,
-            //     mapProvider
-            // });
-
-            setLoadingPrice(true);
-            try {
-                const response = await api.estimatePrice({
-                    pickup_lat: pickupLocation.latitude,
-                    pickup_lng: pickupLocation.longitude,
-                    dropoff_lat: dropoffLocation.latitude,
-                    dropoff_lng: dropoffLocation.longitude,
-                    stops: stops.map(s => ({ lat: s.latitude, lng: s.longitude })),
-                    pet_weight_kg: petWeight,
-                    vehicle_type: selectedVehicle.id,
-                    is_round_trip: isRoundTrip
-                });
-                setPrice(response.estimated_price);
-                setWeightSurcharge(response.weight_surcharge || 0);
-                setMultiPetDiscount(response.multi_pet_discount || 0);
-                setSurgeMultiplier(response.surge_multiplier || 1);
-                setSurgeReasons(response.surge_reasons || []);
-                setRoundTripFee(response.round_trip_fee || 0);
-                // Use backend distance/duration if available (fallback for Google Maps failure)
-                if (response.distance_km) setDistance(response.distance_km);
-                if (response.duration_min) setDuration(response.duration_min);
-                // console.log("Fetched price:", response.estimated_price);
-                // console.log("weight:", petWeight);
-            } catch (error) {
-                console.warn("Could not fetch price from backend, using local calculation:", error);
-                // Fallback: Local Calculation
-                if (selectedVehicle && selectedVehicle.basePrice !== undefined && selectedVehicle.perKmRate !== undefined) {
-                    // Local weight surcharge calculation
-                    let localWeightSurcharge = 0;
-                    if (petWeight > 30) localWeightSurcharge = 60;
-                    else if (petWeight > 20) localWeightSurcharge = 40;
-                    else if (petWeight > 10) localWeightSurcharge = 20;
-
-                    // Basic local fallback for multi-pet discount (assumes 50% for now if pet_count > 1)
-                    let localMultiPetDiscount = 0;
-                    const petCount = params.petIds ? (params.petIds as string).split(',').length : 1;
-                    if (petCount > 1 && localWeightSurcharge > 0) {
-                        localMultiPetDiscount = localWeightSurcharge * 0.50; // hardcoded fallback
-                        localWeightSurcharge = Math.max(0, localWeightSurcharge - localMultiPetDiscount);
-                    }
-
-                    setWeightSurcharge(localWeightSurcharge);
-                    setMultiPetDiscount(localMultiPetDiscount);
-
-                    const baseComponents = selectedVehicle.basePrice + (distance * selectedVehicle.perKmRate) + (duration * (selectedVehicle.perMinRate || 0));
-                    const fallbackPrice = Math.max(selectedVehicle.minPrice || 0, Math.round(baseComponents * surgeMultiplier + localWeightSurcharge));
-                    setPrice(fallbackPrice);
-                }
-            } finally {
-                setLoadingPrice(false);
+    // Fetch Price from API. The server is the only source of the price: POST /orders/ re-prices the trip with
+    // the same engine and refuses a quote below its fare, so a locally computed number (which also ignored the
+    // per-stop and round-trip fees) would only be rejected. On failure the reason is shown and booking stays
+    // disabled until an estimate arrives. The 409 handler calls this again to refresh the quote.
+    const fetchPrice = useCallback(async (): Promise<PricingResponse | null> => {
+        if (!pickupLocation || !dropoffLocation || !selectedVehicle) return null;
+        const seq = ++priceSeqRef.current; // a newer request (e.g. vehicle switch) owns the UI
+        setLoadingPrice(true);
+        try {
+            const response = await api.estimatePrice({
+                pickup_lat: pickupLocation.latitude,
+                pickup_lng: pickupLocation.longitude,
+                dropoff_lat: dropoffLocation.latitude,
+                dropoff_lng: dropoffLocation.longitude,
+                stops: stops.map(s => ({ lat: s.latitude, lng: s.longitude })),
+                pet_weight_kg: petWeight,
+                pet_count: petCount,
+                vehicle_type: selectedVehicle.id,
+                is_round_trip: isRoundTrip
+            });
+            if (seq !== priceSeqRef.current) return response;
+            setPrice(response.estimated_price);
+            setPriceError(null);
+            setWeightSurcharge(response.weight_surcharge || 0);
+            setMultiPetDiscount(response.multi_pet_discount || 0);
+            setSurgeMultiplier(response.surge_multiplier || 1);
+            setSurgeReasons(response.surge_reasons || []);
+            setRoundTripFee(response.round_trip_fee || 0);
+            // Use backend distance/duration if available (fallback for Google Maps failure)
+            if (response.distance_km) setDistance(response.distance_km);
+            if (response.duration_min) setDuration(response.duration_min);
+            return response;
+        } catch (error) {
+            if (seq === priceSeqRef.current) {
+                console.warn('Could not fetch price from backend:', error);
+                setPrice(0);
+                setPriceError(errorDetail(error));
             }
-        };
+            throw error;
+        } finally {
+            if (seq === priceSeqRef.current) setLoadingPrice(false);
+        }
+    }, [pickupLocation, dropoffLocation, stops, selectedVehicle, petWeight, petCount, isRoundTrip]);
 
-        fetchPrice();
-    }, [pickupLocation, dropoffLocation, stops, selectedVehicle, distance, petWeight, isRoundTrip]);
+    // `distance` is no longer a dependency: it only fed the removed local fallback, and because the estimate
+    // itself sets it, keeping it re-ran this effect (a second billed request) after every estimate.
+    React.useEffect(() => {
+        fetchPrice().catch(() => { /* the reason is shown via priceError */ });
+    }, [fetchPrice]);
 
-    // Calculate Route Origin/Dest based on status
-    const routeOrigin = (bookingStatus === 'confirmed' && assignedDriver)
-        ? { latitude: assignedDriver.lat, longitude: assignedDriver.lng }
+    // Calculate Route Origin/Dest based on status.
+    // Once confirmed the origin is the driver's live position only. While hydrating an existing order
+    // the location feed has not delivered it yet; a pickup fallback here sent a pickup->pickup request
+    // that shouldRefetchRoute() recorded, blocking the real driver->pickup route for 30 s (forever if
+    // the driver sits still, because this effect only re-runs when assignedDriver changes).
+    const routeOrigin = bookingStatus === 'confirmed'
+        ? (assignedDriver ? { latitude: assignedDriver.lat, longitude: assignedDriver.lng } : null)
         : (pickupLocation ? { latitude: pickupLocation.latitude, longitude: pickupLocation.longitude } : null);
 
     const routeDestination = (bookingStatus === 'confirmed' && currentOrder?.status !== 'in_progress' && currentOrder?.status !== 'picked_up')
@@ -508,8 +501,11 @@ export default function ConfirmBookingScreen() {
                 }
             } catch (error) {
                 if (seq !== routeSeqRef.current) return;
-                // Surface the real reason (key denied, no route, offline) instead of an empty map
-                routeRequestRef.current = { request, at: Date.now(), failed: true };
+                // Surface the real reason (key denied, no route, offline) instead of an empty map.
+                // The code lets shouldRefetchRoute() skip retries that cannot succeed (ZERO_RESULTS, key denied).
+                routeRequestRef.current = {
+                    request, at: Date.now(), failed: true, failureCode: isRoutingError(error) ? error.code : undefined,
+                };
                 setDirectionsRoutes([]);
                 setRouteError(error);
             }
@@ -556,13 +552,16 @@ export default function ConfirmBookingScreen() {
         setAppliedPromo(null);
     }
 
-    const handleBook = async () => {
+    // Book at `quotedPrice` = the fare the customer has just seen. The server re-prices the trip and answers 409
+    // when its fare for this vehicle type is more than 10 THB higher; that path re-estimates and asks again.
+    const submitBooking = async (quotedPrice: number) => {
         if (!pickupLocation || !dropoffLocation || !selectedVehicle) return;
         if (!user?.id) {
             Alert.alert('Error', 'Please login to book a ride');
             return;
         }
-        if (paymentMethod === 'wallet' && walletBalance < price) {
+        if (quotedPrice <= 0 || priceError) return; // the button is disabled in this state; guard the 409 re-submit too
+        if (paymentMethod === 'wallet' && walletBalance < quotedPrice) {
             Alert.alert(
                 'ยอดเงินคงเหลือไม่พอ',
                 `คุณมียอดเงินในวอลเล็ทไม่เพียงพอ (คงเหลือ ฿${formatPrice(walletBalance)}) กรุณาเติมเงินก่อนดำเนินการจอง`,
@@ -591,7 +590,8 @@ export default function ConfirmBookingScreen() {
                 dropoff_address: dropoffLocation.name || dropoffLocation.address || 'Dropoff',
                 dropoff_lat: dropoffLocation.latitude,
                 dropoff_lng: dropoffLocation.longitude,
-                price: price,
+                price: quotedPrice, // the quote the customer saw; the server compares it with its own fare
+                vehicle_type: selectedVehicle.id, // so the server prices this type instead of guessing it from the quote
                 status: 'pending',
                 payment_method: paymentMethod,
                 payment_status: paymentMethod === 'cash' ? 'pending' : 'pending', // Both pending initially
@@ -611,10 +611,12 @@ export default function ConfirmBookingScreen() {
                 }))
             });
 
-            // Create initial payment record
+            // Create initial payment record for what the server stored on the order (its fare minus any promo it
+            // applied) - not the app's quote, which is only a comparison input. `price` arrives as a Decimal string.
+            const serverPrice = order.price == null ? NaN : Number(order.price);
             await api.createPayment({
                 order_id: order.id,
-                amount: price,
+                amount: Number.isFinite(serverPrice) && serverPrice >= 0 ? serverPrice : quotedPrice,
                 method: paymentMethod,
                 status: 'pending'
             });
@@ -752,12 +754,47 @@ export default function ConfirmBookingScreen() {
                 }
             }, 300000);
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to create order:', error);
             setBookingStatus('idle');
-            Alert.alert('Booking Failed', error.message || 'Unable to create booking. Please try again.');
+            if (isApiError(error) && error.status === 409) {
+                // The server's fare is above the quote: refresh the price and let the customer decide
+                await handlePriceConflict(quotedPrice);
+                return;
+            }
+            if (isApiError(error) && error.status === 401) {
+                // Session expired between the estimate and the booking: clear it, the app returns to login
+                await useAuthStore.getState().logout();
+                return;
+            }
+            Alert.alert(t('booking_failed_title'), errorDetail(error) || t('booking_failed_generic'));
         }
     };
+
+    // POST /orders/ answered 409 ("Price changed ..."): re-estimate, show the new fare and book only once the
+    // customer agrees to it. Nothing is ever booked at a price the customer has not seen.
+    const handlePriceConflict = async (quotedPrice: number) => {
+        let fresh: PricingResponse | null;
+        try {
+            fresh = await fetchPrice();
+        } catch (error) {
+            // priceError is set and the button disabled; say why the price could not be refreshed
+            Alert.alert(t('price_changed_title'), t('price_changed_refresh_failed', { detail: errorDetail(error) }));
+            return;
+        }
+        if (!fresh) return;
+        const newPrice = fresh.estimated_price;
+        Alert.alert(
+            t('price_changed_title'),
+            t('price_changed_message', { newPrice: formatPrice(newPrice), oldPrice: formatPrice(quotedPrice) }),
+            [
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('price_changed_confirm', { newPrice: formatPrice(newPrice) }), onPress: () => { submitBooking(newPrice); } },
+            ]
+        );
+    };
+
+    const handleBook = () => { submitBooking(price); };
 
     const handleCancelOrder = async () => {
         if (!currentOrder) return;
@@ -1176,7 +1213,7 @@ export default function ConfirmBookingScreen() {
                                         <Text className="font-bold text-gray-800">{vehicle.name}</Text>
                                         <Text className="text-primary font-bold">
                                             ฿{selectedVehicle?.id === vehicle.id && !loadingPrice
-                                                ? formatPrice(price)
+                                                ? (priceError ? '—' : formatPrice(price))
                                                 : formatPrice(Math.max(vehicle.minPrice || 0, Math.round(((vehicle.basePrice + (distance * vehicle.perKmRate) + (duration * (vehicle.perMinRate || 0))) * surgeMultiplier) + weightSurcharge)))
                                             }
                                         </Text>
@@ -1392,15 +1429,30 @@ export default function ConfirmBookingScreen() {
                             <Text className="text-lg font-bold text-gray-900">Total</Text>
                             {loadingPrice ? (
                                 <Text className="text-2xl font-bold text-primary">Loading...</Text>
+                            ) : priceError ? (
+                                <Text className="text-2xl font-bold text-gray-400">—</Text>
                             ) : (
                                 <Text className="text-2xl font-bold text-primary">฿{formatPrice(appliedPromo ? price - appliedPromo.discount_amount : price)}</Text>
                             )}
                         </View>
+                        {priceError && (
+                            <View className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200">
+                                <Text className="text-red-700 font-medium">{t('price_unavailable')}</Text>
+                                <Text className="text-red-500 text-xs mt-1">{priceError}</Text>
+                                <TouchableOpacity
+                                    onPress={() => { fetchPrice().catch(() => { /* shown via priceError */ }); }}
+                                    className="mt-2 self-start"
+                                >
+                                    <Text className="text-primary font-bold">{t('retry')}</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
                         <AppButton
                             className="mb-10"
-                            title="Confirm Booking"
+                            title={t('confirm_booking')}
                             onPress={handleBook}
                             size="lg"
+                            disabled={loadingPrice || price <= 0 || !!priceError}
                         />
                     </View>
                 )}
