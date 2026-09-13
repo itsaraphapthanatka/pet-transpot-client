@@ -132,7 +132,7 @@ export default function PaymentSummaryScreen() {
                         </View>
                         <View className="flex-1">
                             <Text className="text-gray-400 text-xs font-bold uppercase">{t('driver')}</Text>
-                            <Text className="text-gray-900 font-bold">{order.driver?.user?.full_name || 'Driver'}</Text>
+                            <Text className="text-gray-900 font-bold">{order.driver?.full_name || t('driver')}</Text>
                         </View>
                         <View className="flex-row items-center bg-yellow-50 px-2 py-1 rounded-lg">
                             <Star size={14} color="#EAB308" fill="#EAB308" />

@@ -180,7 +180,11 @@ const resources = {
             payment_success_title: "Payment successful",
             payment_success_message: "Your payment has been confirmed.",
             payment_pending_title: "Awaiting confirmation",
-            payment_pending_message: "Stripe has not confirmed this payment yet. Tap \"Refresh status\" in a moment - do not pay again."
+            payment_pending_message: "Stripe has not confirmed this payment yet. Tap \"Refresh status\" in a moment - do not pay again.",
+
+            // Chat: the WebSocket is authenticated with the access token and never retries by itself
+            chat_socket_auth_failed: "Chat could not be opened: your session is no longer valid for this trip. Please sign in again.",
+            chat_socket_disconnected: "Chat is disconnected, so new messages will not appear. Leave this screen and open it again to reconnect."
         }
     },
     th: {
@@ -360,7 +364,11 @@ const resources = {
             payment_success_title: "ชำระเงินสำเร็จ",
             payment_success_message: "ระบบยืนยันยอดชำระเงินของคุณเรียบร้อยแล้ว",
             payment_pending_title: "รอการยืนยัน",
-            payment_pending_message: "Stripe ยังไม่ยืนยันยอดชำระนี้ กรุณากด \"รีเฟรชสถานะ\" อีกครั้งในอีกสักครู่ และอย่าชำระซ้ำ"
+            payment_pending_message: "Stripe ยังไม่ยืนยันยอดชำระนี้ กรุณากด \"รีเฟรชสถานะ\" อีกครั้งในอีกสักครู่ และอย่าชำระซ้ำ",
+
+            // Chat: the WebSocket is authenticated with the access token and never retries by itself
+            chat_socket_auth_failed: "เปิดแชทไม่ได้ เพราะเซสชันของคุณใช้กับทริปนี้ไม่ได้แล้ว กรุณาเข้าสู่ระบบใหม่",
+            chat_socket_disconnected: "การเชื่อมต่อแชทหลุด ข้อความใหม่จะไม่แสดง กรุณาออกจากหน้านี้แล้วเปิดใหม่เพื่อเชื่อมต่ออีกครั้ง"
         }
     }
 };

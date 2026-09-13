@@ -107,7 +107,7 @@ export default function CustomerHistoryScreen() {
                             </View>
                             <View>
                                 <Text className="text-xs text-gray-500">คนขับ</Text>
-                                <Text className="text-sm font-bold text-gray-800">{order.driver.user?.full_name || 'คนขับพาร์ทเนอร์'}</Text>
+                                <Text className="text-sm font-bold text-gray-800">{order.driver.full_name || 'คนขับพาร์ทเนอร์'}</Text>
                             </View>
                         </>
                     ) : (
