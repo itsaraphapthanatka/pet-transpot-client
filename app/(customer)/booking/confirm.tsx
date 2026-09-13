@@ -1128,7 +1128,7 @@ export default function ConfirmBookingScreen() {
 
                                     {stops.map((stop, index) => (
                                         <View key={`stop-summary-${index}`}>
-                                            <Text className="text-gray-500 text-[10px] uppercase mb-1">{t('stop') || 'Stop'} {index + 1}</Text>
+                                            <Text className="text-gray-500 text-[10px] uppercase mb-1">{t('stop')} {index + 1}</Text>
                                             <Text className="font-semibold text-gray-800" numberOfLines={1}>{stop.name || stop.address}</Text>
                                             <Text className="text-gray-500 text-xs" numberOfLines={1}>{stop.address}</Text>
                                         </View>

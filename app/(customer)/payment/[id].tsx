@@ -18,6 +18,7 @@ import { api } from '../../../services/api';
 import { Order } from '../../../types/order';
 import { AppButton } from '../../../components/ui/AppButton';
 import { formatPrice } from '../../../utils/format';
+import { errorDetail } from '../../../utils/apiError';
 
 function CustomerPaymentScreen() {
     const { id } = useLocalSearchParams();
@@ -53,7 +54,8 @@ function CustomerPaymentScreen() {
             Alert.alert("สำเร็จ", "ชำระเงินผ่านวอลเล็ทเรียบร้อยแล้ว!");
             fetchData();
         } catch (error: any) {
-            Alert.alert("ข้อผิดพลาด", error.message || "การชำระเงินผ่านวอลเล็ทล้มเหลว");
+            // errorDetail = the backend reason (insufficient balance, already paid) without the ApiError prefix
+            Alert.alert("ข้อผิดพลาด", errorDetail(error) || "การชำระเงินผ่านวอลเล็ทล้มเหลว");
         } finally {
             setIsProcessing(false);
         }

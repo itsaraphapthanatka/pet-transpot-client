@@ -100,6 +100,18 @@ const resources = {
             add_credit_card: "Add Credit/Debit Card",
             pay_at_destination_cash: "Pay at destination (Cash)",
 
+            // Location picker / search (app/(customer)/booking/location-picker.tsx, location-search.tsx,
+            // components/LocationSearch.tsx). These were called through t() before they existed here, so
+            // the screens printed the raw key names.
+            could_not_get_location: "Could not get your current location",
+            search_pickup: "Search pickup location",
+            search_dropoff: "Search drop-off location",
+            confirm_location: "Confirm location",
+            choose_on_map: "Set on map",
+            select_location: "Select location",
+            add_stop: "Add stop",
+            stop: "Stop",
+
             // Statuses/Jobs
             finding_driver: "Finding your driver...",
             connecting_nearest: "We are connecting you with the nearest {{vehicle}}",
@@ -283,6 +295,18 @@ const resources = {
             credit_card: "บัตรเครดิต/เดบิต",
             add_credit_card: "เพิ่มบัตรเครดิต",
             pay_at_destination_cash: "ชำระเมื่อถึงที่หมาย (เงินสด)",
+
+            // Location picker / search (app/(customer)/booking/location-picker.tsx, location-search.tsx,
+            // components/LocationSearch.tsx). These were called through t() before they existed here, so
+            // the screens printed the raw key names.
+            could_not_get_location: "ไม่สามารถระบุตำแหน่งปัจจุบันได้",
+            search_pickup: "ค้นหาจุดรับ",
+            search_dropoff: "ค้นหาจุดส่ง",
+            confirm_location: "ยืนยันตำแหน่ง",
+            choose_on_map: "เลือกจากแผนที่",
+            select_location: "เลือกตำแหน่ง",
+            add_stop: "เพิ่มจุดแวะ",
+            stop: "จุดแวะ",
 
             // Statuses/Jobs
             finding_driver: "กำลังหาคนขับรถ...",

@@ -6,6 +6,10 @@ import { api } from '../services/api';
 import { useAuthStore } from '../store/useAuthStore';
 import { useTranslation } from 'react-i18next';
 
+// Customer-app copy: every route pushed below must exist under this repo's app/ directory. The driver
+// app has the same component pointing at its own (driver) group, so this file is intentionally NOT
+// identical in the two apps. Do not add `as any` to a router.push here - that is what let the driver
+// app keep pushing (customer) routes it does not have.
 export const NotificationListener: React.FC = () => {
     const { t } = useTranslation();
     const { user, isAuthenticated } = useAuthStore();
@@ -28,9 +32,9 @@ export const NotificationListener: React.FC = () => {
                 router.push({
                     pathname: "/(customer)/chat/[orderId]",
                     params: { orderId }
-                } as any);
+                });
             } else {
-                router.push("/(customer)/notifications" as any);
+                router.push("/(customer)/notifications");
             }
         });
 
@@ -81,9 +85,9 @@ export const NotificationListener: React.FC = () => {
                                                 router.push({
                                                     pathname: "/(customer)/chat/[orderId]",
                                                     params: { orderId }
-                                                } as any);
+                                                });
                                             } else {
-                                                router.push("/(customer)/notifications" as any);
+                                                router.push("/(customer)/notifications");
                                             }
                                         }
                                     }

@@ -9,7 +9,11 @@ import {
     OTPResponse,
     User,
 } from '../types/auth';
+import { apiFetch } from './httpClient';
 
+// Every request below goes through apiFetch (services/httpClient.ts). The 401s that matter here come from
+// GET /auth/me with a dead token: the handler store/useAuthStore registers clears the session (it returns
+// early when nobody is signed in, so a wrong password on the login screen is still just a failed login).
 const getBaseUrl = () => {
     let url = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:8000';
     if (Platform.OS === 'android' && (url.includes('localhost') || url.includes('127.0.0.1'))) {
@@ -62,7 +66,7 @@ export const authService = {
             formData.append('password', password);
 
             // Customer app: POST /auth/login (users + admins). /auth/driver/login only checks the drivers table.
-            const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            const response = await apiFetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -98,7 +102,7 @@ export const authService = {
      */
     async register(data: RegisterRequest): Promise<AuthResponse> {
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/register`, {
+            const response = await apiFetch(`${API_BASE_URL}/auth/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -129,7 +133,7 @@ export const authService = {
     async requestOTP(phoneNumber: string): Promise<OTPResponse> {
         try {
             const url = `${API_BASE_URL}/auth/request-otp`;
-            const response = await fetch(url, {
+            const response = await apiFetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -157,7 +161,7 @@ export const authService = {
             const url = `${API_BASE_URL}/auth/verify-otp`;
             const body = { phone_number: phoneNumber, otp };
 
-            const response = await fetch(url, {
+            const response = await apiFetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -211,7 +215,7 @@ export const authService = {
             }
 
             const url = `${API_BASE_URL}/auth/me`;
-            const response = await fetch(url, {
+            const response = await apiFetch(url, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,

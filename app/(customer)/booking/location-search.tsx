@@ -97,7 +97,7 @@ export default function LocationSearchScreen() {
                     <View className={`w-2 h-2 rounded-full mr-3 ${mode === 'pickup' ? 'bg-blue-500' : 'bg-red-500'}`} />
                     <TextInput
                         className="flex-1 text-base text-gray-800 h-full"
-                        placeholder={mode === 'pickup' ? t('search_pickup') || "Search pickup location" : t('search_dropoff') || "Search drop-off location"}
+                        placeholder={mode === 'pickup' ? t('search_pickup') : t('search_dropoff')}
                         placeholderTextColor="#9CA3AF"
                         value={query}
                         onChangeText={setQuery}
@@ -127,7 +127,7 @@ export default function LocationSearchScreen() {
                         <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center mr-3">
                             <MapIcon size={20} color="#3B82F6" />
                         </View>
-                        <Text className="text-base font-semibold text-gray-800">{t('choose_on_map') || "Set on map"}</Text>
+                        <Text className="text-base font-semibold text-gray-800">{t('choose_on_map')}</Text>
                     </TouchableOpacity>
 
                     {/* Results List */}
