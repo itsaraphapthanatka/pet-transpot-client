@@ -2,7 +2,7 @@
 name: code-reviewer
 description: Read-only code reviewer for every PetGo repo — FastAPI backend, the two Expo apps (pet-transpot-client, petgo-driver), the Next.js admin, and the landing page. Reviews uncommitted changes by default, or a commit range / branch / file list when given. Finds real bugs, security issues, and consistency problems, and reports them in Thai with file:line and a concrete fix. Use proactively after a feature is finished or before a commit, and whenever the user asks to review / audit / ตรวจโค้ด / รีวิว / ดูโค้ดให้หน่อย.
 tools: Bash, Read, Grep, Glob
-model: fable
+model: opus
 effort: max
 memory: project
 skills:

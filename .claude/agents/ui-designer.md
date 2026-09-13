@@ -2,7 +2,7 @@
 name: ui-designer
 description: "UI / visual designer for PetGo's customer app, driver app, admin panel, and landing page. Owns the design system (tokens, type scale, spacing, components, icons, dark mode) and turns ux-designer screen specs into component specs with real NativeWind / Tailwind classes that devs paste in; runs visual QA of implemented screens against the mockup and the design system. Use for design system, component spec, styling, theme, dark mode, visual QA, icon choice, or when the user says ออกแบบ UI / หน้าตา / สี / ฟอนต์ / component / ให้สวย."
 tools: Read, Grep, Glob, Bash, Write, WebSearch, WebFetch
-model: fable
+model: opus
 effort: xhigh
 memory: project
 skills:

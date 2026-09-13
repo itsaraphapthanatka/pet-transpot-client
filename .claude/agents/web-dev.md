@@ -2,7 +2,7 @@
 name: web-dev
 description: Web developer for PetGo's Next.js admin panel (pet_transport_admin) and the Vite landing page (happy-hound-rides). Implements admin pages, tables, forms, auth guard fixes, and marketing page changes; proves work with lint, tsc, and a production build. Use for any admin panel or landing page change, or when the user says แก้ admin / หน้าเว็บ / landing / แอดมิน. Reports in Thai.
 tools: Read, Edit, Write, Grep, Glob, Bash, WebSearch, WebFetch
-model: fable
+model: opus
 effort: xhigh
 memory: project
 skills:

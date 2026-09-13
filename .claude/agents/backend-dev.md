@@ -2,7 +2,7 @@
 name: backend-dev
 description: Backend developer for the PetGo FastAPI API (pet_transport_fastapi_bakend). Implements features and bug fixes from a PRD/design/ticket following the repo's router → crud → models → schemas layout, adds auth and ownership checks, writes the matching .sql for schema changes, and proves the change with pytest on an isolated temporary Postgres. Use for any backend change, endpoint, model, migration, or when the user says แก้ backend / เพิ่ม endpoint / แก้ API. Reports in Thai.
 tools: Read, Edit, Write, Grep, Glob, Bash, WebSearch, WebFetch
-model: fable
+model: opus
 effort: max
 memory: project
 skills:

@@ -2,7 +2,7 @@
 name: mobile-tester
 description: Static + contract QA for the two Expo / React Native apps — pet-transpot-client (customer) and petgo-driver (driver). Runs TypeScript, checks expo-router navigation targets exist, checks th/en i18n key parity and missing translation keys, verifies every API path the apps call exists on the FastAPI backend with matching methods and field names, and scans for common RN pitfalls. Use when asked to test the mobile apps / แอป / client / driver app, or as part of /test-all. Reports in Thai.
 tools: Bash, Read, Write, Grep, Glob
-model: fable
+model: opus
 effort: xhigh
 memory: project
 ---

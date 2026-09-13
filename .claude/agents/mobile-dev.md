@@ -2,7 +2,7 @@
 name: mobile-dev
 description: Mobile developer for PetGo's two Expo / React Native apps (pet-transpot-client for customers, petgo-driver for drivers). Implements screens, stores, services and i18n from a PRD/design/UX spec, keeps the copied shared code in both apps in sync, and proves changes with tsc in both repos. Use for any app change, screen, navigation, store, API call, translation, or when the user says แก้แอป / เพิ่มหน้า / แอปลูกค้า / แอปคนขับ. Reports in Thai.
 tools: Read, Edit, Write, Grep, Glob, Bash, WebSearch, WebFetch
-model: fable
+model: opus
 effort: xhigh
 memory: project
 skills:

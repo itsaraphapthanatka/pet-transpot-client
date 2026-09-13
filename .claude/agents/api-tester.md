@@ -2,7 +2,7 @@
 name: api-tester
 description: Backend QA for the PetGo FastAPI API (pet_transport_fastapi_bakend). Boots an isolated temporary Postgres (no Docker needed), runs alembic migrations, starts the app in-process with TestClient, sweeps every endpoint for 500s and auth behaviour, and exercises each router. Use when asked to test the API / backend / ทดสอบ backend / เทส API, or as part of /test-all. Reports in Thai.
 tools: Bash, Read, Write, Grep, Glob
-model: fable
+model: opus
 effort: xhigh
 memory: project
 ---

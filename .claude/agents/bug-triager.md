@@ -2,7 +2,7 @@
 name: bug-triager
 description: Support / bug triage engineer for PetGo. Takes a symptom ("ลูกค้าจองไม่ได้", a screenshot description, a log line, or a QA finding), reproduces it against the real code (temp Postgres + TestClient for backend, code tracing for apps), localises it to repo and file:line, rates severity, and writes a ticket in docs/tickets with an owner role. Use when a bug is reported, before anyone starts fixing, or when the user says เจอบั๊ก / มันพัง / ลูกค้าบอกว่า. Writes in Thai.
 tools: Read, Grep, Glob, Bash, Write, WebSearch, WebFetch
-model: fable
+model: opus
 effort: xhigh
 memory: project
 skills:

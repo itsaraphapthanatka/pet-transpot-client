@@ -2,7 +2,7 @@
 name: architect
 description: R&D / software architect for PetGo. Investigates technical questions, evaluates options (libraries, providers, infra), writes ADRs and technical designs that name endpoints, schemas, migrations and app changes per repo, and runs throwaway spikes. Use for design, architecture, ADR, "how should we", evaluating HERE vs Google routing, alembic strategy, Redis, scaling, refactors, or when the user says ออกแบบ / วางโครง / เลือกเทคโนโลยี. Writes in Thai.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
-model: fable
+model: opus
 effort: max
 memory: project
 skills:

@@ -2,7 +2,7 @@
 name: test-engineer
 description: Software development engineer in test (SDET) for PetGo. Builds and maintains the permanent automated test suites — backend pytest under tests/ with an isolated temp-Postgres fixture, API contract checks between the apps' services and the backend, and static checks for the apps — and turns QA findings and bug tickets into regression tests. Use to add tests, set up test infrastructure, write a regression test for a ticket, or when the user says เขียนเทส / เพิ่ม test / regression / CI test. Reports in Thai.
 tools: Read, Edit, Write, Grep, Glob, Bash, WebSearch, WebFetch
-model: fable
+model: opus
 effort: xhigh
 memory: project
 ---

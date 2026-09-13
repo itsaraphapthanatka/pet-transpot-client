@@ -2,7 +2,7 @@
 name: e2e-tester
 description: "End-to-end business-flow tester for PetGo. Drives the real backend (in-process, on an isolated temporary Postgres) through the complete order lifecycle exactly as the customer app, driver app, and admin panel would: OTP login → pet → quote → promo → order → driver approve/online/accept → pickup → complete → payment → review → admin reporting, plus the negative paths between roles. Use when asked to test the whole system / flow / ทดสอบระบบทั้งหมด / e2e, or as part of /test-all. Reports in Thai."
 tools: Bash, Read, Write, Grep, Glob
-model: fable
+model: opus
 effort: max
 memory: project
 ---

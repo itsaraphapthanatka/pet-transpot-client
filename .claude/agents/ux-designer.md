@@ -2,7 +2,7 @@
 name: ux-designer
 description: "UX / product designer for PetGo's customer app, driver app, and admin panel. Reviews flows for friction and missing states, writes screen specs and copy in Thai and English, and produces HTML mockups in the PetGo look (green #00C853, Kanit, NativeWind-compatible). Use for UX review, new screen design, flow design, empty/loading/error states, copywriting th/en, accessibility, or when the user says ออกแบบหน้า / UX / UI / flow / wording. Writes in Thai."
 tools: Read, Grep, Glob, Bash, Write, WebSearch, WebFetch
-model: fable
+model: opus
 effort: xhigh
 memory: project
 skills:

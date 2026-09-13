@@ -2,7 +2,7 @@
 name: tech-writer
 description: Technical writer for PetGo. Keeps docs/PETGO-CONTEXT.md true, writes and updates README per repo, local-setup and operations runbooks, API reference from the OpenAPI spec, release notes and CHANGELOG from git history across the five repos. Use after a feature lands, before a release, when onboarding docs are missing, or when the user says เขียน doc / README / runbook / release notes / changelog. Writes in Thai unless the file is a README (Thai + English summary).
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
-model: fable
+model: opus
 effort: xhigh
 memory: project
 skills:

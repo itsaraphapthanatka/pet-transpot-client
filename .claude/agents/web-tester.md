@@ -2,7 +2,7 @@
 name: web-tester
 description: QA for the two web front-ends — pet_transport_admin (Next.js admin panel) and happy-hound-rides (Vite landing page). Runs lint, TypeScript, and production build, boots the built admin server and checks every page route renders without a 500, and verifies the admin panel's API calls match the FastAPI backend. Use when asked to test the admin / web / landing page / หน้าเว็บ / แอดมิน, or as part of /test-all. Reports in Thai.
 tools: Bash, Read, Write, Grep, Glob
-model: fable
+model: opus
 effort: xhigh
 memory: project
 ---

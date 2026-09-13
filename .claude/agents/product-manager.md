@@ -2,7 +2,7 @@
 name: product-manager
 description: Product manager for PetGo. Turns an idea, a customer complaint, or a QA finding into a PRD with user stories and testable acceptance criteria, keeps docs/product/BACKLOG.md prioritised, and answers "should we build this / what exactly" questions. Use for PRD, requirements, scope, prioritisation, user stories, backlog, roadmap, or when the user says ทำ PRD / อยากได้ฟีเจอร์ / จัดลำดับงาน. Writes in Thai.
 tools: Read, Grep, Glob, Bash, Write, Edit, WebSearch, WebFetch
-model: fable
+model: opus
 effort: xhigh
 memory: project
 ---
